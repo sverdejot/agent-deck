@@ -16,7 +16,6 @@ go = "1.27.3"
 "cargo:espup" = "0.19.0"
 "cargo:espflash" = "4.7.0"
 "cargo:ldproxy" = "0.3.5"
-git-cliff = "2.14.2"
 
 [env]
 # serial port of the Indicator's ESP32-S3 (CH340), found at run time; override in mise.local.toml
@@ -80,6 +79,3 @@ dir = "host"
 depends = ["host:build"]
 run = ["./agent-deck install-statusline", "./agent-deck install"]
 
-[tasks."release:preview"]
-description = "Next version and release notes from the commits since the last tag (what CI would release)"
-run = ["git-cliff --bumped-version", "git-cliff --unreleased --bump --strip all"]

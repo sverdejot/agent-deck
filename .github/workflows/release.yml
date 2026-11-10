@@ -10,12 +10,11 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# On every push to main, git-cliff (cliff.toml) reads the Conventional Commits since the last vX.Y.Z
-# tag. If any of them is releasable (feat, fix, perf, refactor, breaking), it computes the next
-# version, commits CHANGELOG.md, tags vX.Y.Z and opens a draft GitHub Release with the notes. The
-# jobs below attach the Mac binaries, the merged firmware image and checksums.txt, then the release
-# is published and marked Latest, and the web flasher (docs/flasher) goes to GitHub Pages.
-# Actions are pinned to commit SHAs (tag in the comment); git-cliff comes from mise.toml/mise.lock.
+# On every push to main, semantic-release (.releaserc.json) reads the Conventional Commits since the
+# last vX.Y.Z tag and, if any is releasable (feat, fix, perf, breaking), tags the next version and
+# publishes the GitHub Release with the changelog as its notes. The jobs below attach the Mac
+# binaries, the merged firmware image and checksums.txt, and publish the web flasher (docs/flasher)
+# to GitHub Pages. Actions are pinned to commit SHAs (tag in the comment).
 
 jobs:
   release:
@@ -23,49 +22,21 @@ jobs:
     permissions:
       contents: write
     outputs:
-      created: ${{ steps.next.outputs.created }}
-      tag: ${{ steps.next.outputs.tag }}
-      version: ${{ steps.next.outputs.version }}
+      created: ${{ steps.sr.outputs.new_release_published }}
+      tag: ${{ steps.sr.outputs.new_release_git_tag }}
+      version: ${{ steps.sr.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # every commit and tag, to compute the version
-      - name: Install git-cliff (version and checksum from mise.lock)
-        run: |
-          lock=$(awk '/^\[tools.git-cliff."platforms.linux-x64"\]/{f=1;next} /^\[/{f=0} f' mise.lock)
-          url=$(sed -n 's/^url = "\(.*\)"/\1/p' <<<"$lock")
-          sum=$(sed -n 's/^checksum = "sha256:\(.*\)"/\1/p' <<<"$lock")
-          curl -fsSL "$url" -o "$RUNNER_TEMP/git-cliff.tar.gz"
-          echo "$sum  $RUNNER_TEMP/git-cliff.tar.gz" | sha256sum -c
-          tar -xzf "$RUNNER_TEMP/git-cliff.tar.gz" -C "$RUNNER_TEMP"
-          echo "$(dirname "$(find "$RUNNER_TEMP" -type f -name git-cliff | head -1)")" >> "$GITHUB_PATH"
-      - name: Next version
-        id: next
-        run: |
-          next=$(git-cliff --bumped-version)
-          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
-          if [ "$next" = "$last" ]; then
-            echo "Nothing releasable since $last"
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "$last -> $next"
-          { echo "created=true"; echo "tag=$next"; echo "version=${next#v}"; } >> "$GITHUB_OUTPUT"
-      - name: Changelog, tag and draft release
-        if: steps.next.outputs.created == 'true'
+          fetch-depth: 0
+          persist-credentials: false
+      - id: sr
+        uses: cycjimmy/semantic-release-action@ad51787758d9654d5a75150a89a6fa9b3ccef95e # v8.1.4
+        with:
+          semantic_version: 25.0.9
+          extra_plugins: conventional-changelog-conventionalcommits@10.4.1
         env:
-          TAG: ${{ steps.next.outputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git-cliff --bump --unreleased --strip all > "$RUNNER_TEMP/notes.md"
-          git-cliff --bump --output CHANGELOG.md
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "chore(release): $TAG"
-          git tag -a "$TAG" -m "$TAG"
-          git push --atomic origin HEAD:main "$TAG"
-          gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          GITHUB_TOKEN: ${{ github.token }}
 
   host:
     name: host (darwin ${{ matrix.arch }})
@@ -169,8 +140,7 @@ jobs:
           path: firmware/agent-deck-firmware_${{ env.VERSION }}_esp32s3.bin
           if-no-files-found: error
 
-  publish:
-    name: checksums and publish
+  checksums:
     needs: [release, host, firmware]
     runs-on: ubuntu-latest
     permissions:
@@ -186,11 +156,9 @@ jobs:
           gh release download "$TAG" --pattern 'agent-deck*'
           sha256sum agent-deck* | tee checksums.txt
           gh release upload "$TAG" checksums.txt --clobber
-      - name: Publish the release and mark it Latest
-        run: gh release edit "$TAG" --draft=false --latest
 
   pages:
-    needs: [release, firmware, publish]
+    needs: [release, firmware]
     runs-on: ubuntu-latest
     permissions:
       contents: read
