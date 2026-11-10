@@ -1,5 +1,5 @@
 use deck_ui::gfx::{H, W};
-use deck_ui::ui::grid::{page_count, page_size, session_rect, tile_rect, Rect, PER_PAGE};
+use deck_ui::ui::grid::{page_count, page_size, session_rect, slot_count, tile_rect, Rect, PER_PAGE};
 
 fn overlaps(a: Rect, b: Rect) -> bool {
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
@@ -8,7 +8,7 @@ fn overlaps(a: Rect, b: Rect) -> bool {
 #[test]
 fn layouts_by_count() {
     // (sessions, columns in the first row, rows)
-    for (n, cols, rows) in [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 2, 2), (5, 3, 2), (6, 3, 2), (7, 3, 3), (9, 3, 3)] {
+    for (n, cols, rows) in [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 2, 2), (5, 2, 3), (6, 2, 3), (7, 3, 3), (9, 3, 3)] {
         let rects: Vec<Rect> = (0..n).map(|i| session_rect(n, i)).collect();
         let first_row = rects.iter().filter(|r| r.y == rects[0].y).count();
         let distinct_rows = {
@@ -44,12 +44,36 @@ fn tiles_stay_on_screen_whole_pixels_and_never_overlap() {
 }
 
 #[test]
-fn short_last_row_stretches() {
-    // 5 sessions: 3 on top, the last 2 share the full width
-    let top = session_rect(5, 0);
-    let bottom = session_rect(5, 3);
-    assert!(bottom.w > top.w);
-    assert_eq!(bottom.x, top.x);
+fn short_last_row_keeps_tile_size_and_leaves_empty_slots() {
+    for n in [5, 7, 8] {
+        let first = session_rect(n, 0);
+        let last = session_rect(n, n - 1);
+        assert_eq!((last.w, last.h), (first.w, first.h), "n = {n}");
+        assert_eq!(last.x, first.x, "n = {n}: the last row starts at the left");
+    }
+    assert_eq!(slot_count(5, 5), 6);
+    assert_eq!(slot_count(7, 7), 9);
+    assert_eq!(slot_count(3, 3), 3);
+    // the empty slot of 5 sessions sits right of the 5th tile, same size
+    let (fifth, empty) = (tile_rect(5, 4, 5), tile_rect(5, 5, 5));
+    assert_eq!((empty.y, empty.w, empty.h), (fifth.y, fifth.w, fifth.h));
+    assert!(empty.x > fifth.x);
+}
+
+#[test]
+fn empty_slots_stay_on_screen_and_never_overlap_tiles() {
+    for n in 1..=27 {
+        for p in 0..page_count(n) {
+            let count = page_size(n, p);
+            let rects: Vec<Rect> = (0..slot_count(n, count)).map(|k| tile_rect(n, k, count)).collect();
+            for (i, r) in rects.iter().enumerate() {
+                assert!(r.x >= 0.0 && r.y >= 0.0 && r.x + r.w <= W as f32 && r.y + r.h <= H as f32, "n={n} {r:?}");
+                for o in &rects[i + 1..] {
+                    assert!(!overlaps(*r, *o), "n={n}: {r:?} overlaps {o:?}");
+                }
+            }
+        }
+    }
 }
 
 #[test]

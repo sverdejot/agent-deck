@@ -1,6 +1,7 @@
-//! Sesiones screen: one tile per session. Colour is the state: working = solid orange, needs
-//! you = pulsing orange border, ready = orange border, idle = faint border. Repo in small caps at
-//! the top, title anchored to the bottom, age under it, context-window bar along the bottom edge.
+//! Sesiones screen: one tile per session (empty slots of a short last row outlined). Colour is
+//! the state: working = solid orange, needs you = pulsing orange border, ready = orange border,
+//! idle = faint border. Repo in small caps at the top, title anchored to the bottom, age under it,
+//! context-window bar along the bottom edge.
 
 use super::grid::{self, Rect, PER_PAGE};
 use super::theme::{
@@ -53,6 +54,14 @@ impl Ui {
             return;
         }
         let count = grid::page_size(n, p);
+        // empty slots of a short last row: a faint outline, so the grid reads as intentional
+        for k in count..grid::slot_count(n, count) {
+            let mut r = grid::tile_rect(n, k, count);
+            r.x += xoff;
+            if r.y < c.clip_y1 as f32 && r.y + r.h > c.clip_y0 as f32 && r.x < W as f32 && r.x + r.w > 0.0 {
+                c.frame(r.x, r.y, r.w, r.h, 2.0, GREY);
+            }
+        }
         for k in 0..count {
             let mut r = grid::tile_rect(n, k, count);
             r.x += xoff;

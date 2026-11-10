@@ -13,7 +13,7 @@ one you tap to the front.
 
 | | |
 |---|---|
-| <img src="docs/images/sessions-6.png" width="240" alt="Sessions"> | **Sessions** — one tile per session; the grid adapts from 1 to 9 tiles, then pages. Orange = working, pulsing border = needs you, orange border = finished recently, faint = idle. Repo on top, context-window bar at the bottom. **Tap** to focus the session's tmux pane in Ghostty. |
+| <img src="docs/images/sessions-6.png" width="240" alt="Sessions"> | **Sessions** — one tile per session; the grid adapts from 1 to 9 tiles (rows up to 3, then 2×2, 2×3 and 3×3, all tiles the same size), then pages. Orange = working, pulsing border = needs you, orange border = finished recently, faint = idle. Repo on top, context-window bar at the bottom. **Tap** to focus the session's tmux pane in Ghostty. |
 | <img src="docs/images/summary.png" width="240" alt="Summary"> | **Summary** — hold a tile: what it is doing now, your last message and Claude's last reply, read from the transcript. |
 | <img src="docs/images/limits.png" width="240" alt="Limits"> | **Limits** — 5-hour and weekly plan usage, when they reset, how much of each window has passed, and when you'd hit 100% at the current pace. |
 | <img src="docs/images/usage.png" width="240" alt="Usage"> | **Usage** — today's tokens in 15-minute bars per repo, and the last 7 days. |
