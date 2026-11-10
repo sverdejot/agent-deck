@@ -8,6 +8,7 @@
 //	agent-deck install-statusline    tap Claude Code's statusline (plan limits, context window)
 //	agent-deck uninstall-statusline  restore the original statusline
 //	agent-deck statusline -- CMD     (run by Claude Code) record the snapshot, then run CMD
+//	agent-deck version               print the version
 package main
 
 import (
@@ -20,17 +21,28 @@ import (
 	"github.com/sverdejot/agent-deck/host/internal/macos"
 )
 
-const usage = "usage: agent-deck [-port /dev/cu.x] [-v] [list|install|uninstall|install-statusline|uninstall-statusline]"
+// version is set at release time with -ldflags "-X main.version=..."
+var version = "dev"
+
+const usage = "usage: agent-deck [-port /dev/cu.x] [-v] [-version] [list|install|uninstall|install-statusline|uninstall-statusline|version]"
 
 func main() {
 	port := flag.String("port", "", "serial port (default: auto-detect the Indicator's CH340)")
 	verbose := flag.Bool("v", false, "more output")
+	showVersion := flag.Bool("version", false, "print the version")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	switch flag.Arg(0) {
 	case "":
 		log.SetFlags(log.Ltime)
 		run(*port, *verbose)
+	case "version":
+		fmt.Println(version)
 	case "list":
 		list(*verbose)
 	case "install":
