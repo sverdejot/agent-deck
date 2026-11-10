@@ -1,0 +1,60 @@
+# git-cliff: CHANGELOG.md, release notes and the next version, all from the Conventional Commits
+# on main. The release workflow runs it on every push; see .github/workflows/release.yml.
+#
+#   git cliff --bumped-version       next version (prints the current one if nothing to release)
+#   git cliff --unreleased           notes for what would be released now
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org);
+this file is generated from [Conventional Commits](https://www.conventionalcommits.org) by [git-cliff](https://git-cliff.org).
+"""
+body = """
+{% if version -%}
+{% if previous.version -%}
+## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [{{ version | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/releases/tag/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% endif -%}
+{% else -%}
+## Unreleased
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | split(pat="\n") | first | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))
+{%- endfor %}
+{% endfor %}
+{%- macro remote_url() -%}
+https://github.com/sverdejot/agent-deck
+{%- endmacro %}
+"""
+footer = ""
+trim = false
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = true
+filter_commits = true
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+sort_commits = "oldest"
+# Only breaking changes, feat, fix, perf and refactor make a release; docs, ci, chore… are skipped.
+commit_parsers = [
+  { message = "^[a-z]+(\\(.+\\))?!:", group = "<!-- 0 -->Breaking changes" },
+  { body = "BREAKING[ -]CHANGE", group = "<!-- 0 -->Breaking changes" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Bug fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^refactor", group = "<!-- 4 -->Refactoring" },
+  { message = ".*", skip = true },
+]
+
+[bump]
+# 0.x: a feature bumps the minor, a breaking change too (not the major) until 1.0 is tagged by hand
+features_always_bump_minor = true
+breaking_always_bump_major = false
+initial_tag = "v0.1.0"
