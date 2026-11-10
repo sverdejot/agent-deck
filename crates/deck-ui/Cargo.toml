@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
 description = "Agent Deck UI: protocol, layout and software rendering, independent of the hardware"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sverdejot/agent-deck"
 publish = false
 
 [dependencies]

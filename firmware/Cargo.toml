@@ -5,6 +5,8 @@ edition = "2021"
 resolver = "2"
 rust-version = "1.88"
 description = "Agent Deck firmware for the SenseCAP Indicator D1 (ESP32-S3)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sverdejot/agent-deck"
 publish = false
 
 [[bin]]
