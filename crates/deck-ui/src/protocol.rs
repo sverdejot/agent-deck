@@ -7,6 +7,8 @@ pub const LINK_TIMEOUT_MS: u32 = 7000;
 pub const MAX_SERIES: usize = 4;
 /// 15-minute buckets in a day.
 pub const MAX_BUCKETS: usize = 96;
+/// Most options of a pending question the deck shows.
+pub const MAX_OPTIONS: usize = 6;
 
 /// Sent until the first snapshot arrives.
 pub const HELLO: &str = "H\n";
@@ -19,6 +21,12 @@ pub fn open_msg(id: &str) -> String {
 /// Asks the Mac for the summary of a session.
 pub fn summary_msg(id: &str) -> String {
     format!("R\t{id}\n")
+}
+
+/// Answers the pending question of a session with option `n`. The label goes back so the Mac can
+/// check the same menu is still on screen before typing the answer.
+pub fn answer_msg(id: &str, n: u8, label: &str) -> String {
+    format!("A\t{id}\t{n}\t{label}\n")
 }
 
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
@@ -62,6 +70,24 @@ pub struct Summary {
     pub you: String,
     pub claude: String,
     pub tool: String,
+}
+
+/// A menu Claude Code is waiting on (a question, a permission, a plan approval), answerable from
+/// the deck while its summary is open.
+#[derive(Clone, PartialEq, Eq, Default, Debug)]
+pub struct Question {
+    /// session it belongs to
+    pub id: String,
+    pub text: String,
+    /// (number as Claude Code shows it, label)
+    pub options: Vec<(u8, String)>,
+}
+
+/// One `<n>.<label>` option field of a `Q` line.
+fn parse_option(field: &str) -> Option<(u8, String)> {
+    let (n, label) = field.split_once('.')?;
+    let n: u8 = n.parse().ok()?;
+    ((1..=9).contains(&n) && !label.is_empty()).then(|| (n, label.to_string()))
 }
 
 #[derive(Debug)]
@@ -123,6 +149,8 @@ pub struct State {
     incoming: Vec<Session>,
     /// summary view: open while `Some`
     pub summary: Option<Summary>,
+    /// pending question of the session whose summary is open
+    pub question: Option<Question>,
     pub limits: Limits,
     pub usage: Option<Usage>,
     usage_in: Usage,
@@ -134,6 +162,11 @@ pub struct State {
 impl State {
     pub fn linked(&self, now: u32) -> bool {
         self.ever_linked && now.wrapping_sub(self.last_msg) < LINK_TIMEOUT_MS
+    }
+
+    /// The pending question of session `id`, if its summary is open and Claude is asking.
+    pub fn question_for(&self, id: &str) -> Option<&Question> {
+        self.question.as_ref().filter(|q| q.id == id && self.summary.as_ref().is_some_and(|s| s.id == id))
     }
 
     /// Feeds raw serial bytes; complete lines are handled as they appear.
@@ -187,6 +220,18 @@ impl State {
                     s.tool = get(5).into();
                     s.loaded = true;
                     ch.summary = true;
+                }
+            }
+            "Q" if f.len() >= 2 => {
+                if self.summary.as_ref().is_some_and(|s| s.id == get(1)) {
+                    let fields = f.iter().skip(3).copied();
+                    let options: Vec<(u8, String)> = fields.filter_map(parse_option).take(MAX_OPTIONS).collect();
+                    let q = Question { id: get(1).into(), text: get(2).into(), options };
+                    let q = (!q.text.is_empty() && !q.options.is_empty()).then_some(q);
+                    if q != self.question {
+                        self.question = q;
+                        ch.summary = true;
+                    }
                 }
             }
             "L" if f.len() >= 9 => {

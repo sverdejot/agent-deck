@@ -44,6 +44,21 @@ Y  <id> <meta> <you> <claude> <tool>
 message of each side, markdown flattened to one line. `tool` (150): tool running now ("Bash:
 go build"), only while `busy`.
 
+### Pending question — while a summary is open
+
+```
+Q  <id> <question> <option> <option> …
+Q  <id>                                    nothing to answer (clears it)
+```
+
+Sent after `Y` and again whenever it changes (the Mac re-reads the session's terminal every second
+for ~65 s after the last `R` or `A`), only for sessions in a tmux pane. It is the select menu
+Claude Code is waiting on: a question (AskUserQuestion), a tool permission or a plan approval.
+`question` (300): the question as shown, for permissions with what it asks about ("rm -rf build ·
+Do you want to proceed?"). Each `option` is `<n>.<label>` (label ≤ 80), `n` the number Claude Code
+shows (1-9, not necessarily contiguous: options that need typing, like "Type something", are left
+out); at most 6. The deck keeps it only for the summary it has open.
+
 ### Limits — every 20 s
 
 ```
@@ -73,8 +88,13 @@ cache writes + output; cache reads are left out). `total` is preformatted ("1,8 
 ## Deck → Mac
 
 ```
-H           hello: sent every 2 s until the first snapshot arrives (the Mac answers with everything)
-O  <id>     open: bring this session to the front
-R  <id>     summary: answer with Y
-D  …        stats ("D frame=18ms draw=14ms"), every 5 s; ignored by the Mac
+H                     hello: sent every 2 s until the first snapshot arrives (the Mac answers with everything)
+O  <id>               open: bring this session to the front
+R  <id>               summary: answer with Y (and Q)
+A  <id> <n> <label>   answer the pending question with option n (the label as received in Q)
+D  …                  stats ("D frame=18ms draw=14ms"), every 5 s; ignored by the Mac
 ```
+
+Before typing `n` into the session's tmux pane the Mac reads the menu on screen again and only
+answers if option `n` still has that label, so a late tap can't answer a different question. Then
+it waits ~1.5 s before sending the next `Q`.

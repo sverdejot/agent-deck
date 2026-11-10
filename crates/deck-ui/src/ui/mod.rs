@@ -2,8 +2,10 @@
 //!
 //! The side button cycles Sesiones → Límites → Consumo (the firmware calls [`Ui::next_screen`]).
 //! On Sesiones a tap opens the session on the Mac, holding it shows its summary, and with more
-//! than 9 sessions pages are swiped sideways. Límites and Consumo are read-only. Without a link to
-//! the Mac every screen gives way to the offline screen.
+//! than 9 sessions pages are swiped sideways. When the session is waiting on a menu (a question,
+//! a permission, a plan approval) its summary has one button per option to answer from the deck.
+//! Límites and Consumo are read-only. Without a link to the Mac every screen gives way to the
+//! offline screen.
 
 pub mod grid;
 mod limits;
@@ -14,7 +16,7 @@ pub mod theme;
 mod usage;
 
 use crate::gfx::{fonts, Canvas, H, W};
-use crate::protocol::{open_msg, summary_msg, Session, State, Summary};
+use crate::protocol::{answer_msg, open_msg, summary_msg, Session, State, Summary};
 use theme::{BG, MUTED, TEXT};
 
 const HOLD_MS: u32 = 600;
@@ -22,6 +24,8 @@ const SLOP_PX: i32 = 14;
 const TOAST_MS: u32 = 1400;
 const FLASH_MS: u32 = 500;
 const SUMMARY_TIMEOUT_MS: u32 = 30_000;
+/// Reading a question and its options takes longer.
+const QUESTION_TIMEOUT_MS: u32 = 60_000;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
@@ -59,9 +63,13 @@ pub struct Ui {
     touch_start: (i32, i32),
     touch_start_ms: u32,
     pressed: Option<usize>,
+    /// option button of the summary's question under the finger
+    pressed_option: Option<usize>,
     flash_id: String,
     flash_ms: u32,
     toast_ms: Option<u32>,
+    /// what the toast says; empty = the screen's name
+    toast_text: &'static str,
     summary_opened_ms: u32,
     tiles: Vec<sessions::TileText>,
     /// set when the sessions changed: [`Ui::layout`] must run before the next draw
@@ -80,9 +88,11 @@ impl Default for Ui {
             touch_start: (0, 0),
             touch_start_ms: 0,
             pressed: None,
+            pressed_option: None,
             flash_id: String::new(),
             flash_ms: 0,
             toast_ms: None,
+            toast_text: "",
             summary_opened_ms: 0,
             tiles: Vec::new(),
             layout_dirty: true,
@@ -108,7 +118,7 @@ impl Ui {
             Screen::Limits => limits::draw(c, st),
             Screen::Usage => usage::draw(c, st),
             Screen::Sessions => match &st.summary {
-                Some(sum) => summary::draw(c, st, sum),
+                Some(sum) => summary::draw(c, st, sum, self.pressed_option),
                 None if st.sessions.is_empty() => {
                     draw_centered(c, "Sin sesiones abiertas", Some("Abre Claude Code en la terminal"));
                 }
@@ -118,7 +128,7 @@ impl Ui {
         self.draw_toast(c, now);
     }
 
-    /// Name of the screen, briefly, after switching with the button.
+    /// Name of the screen, briefly, after switching with the button (or a short confirmation).
     fn draw_toast(&self, c: &mut Canvas, now: u32) {
         let Some(t0) = self.toast_ms else { return };
         let t = now.wrapping_sub(t0);
@@ -126,11 +136,15 @@ impl Ui {
             return;
         }
         let a = if t < 1000 { 1.0 } else { 1.0 - (t - 1000) as f32 / 400.0 };
-        let name = self.screen.name();
+        let message = !self.toast_text.is_empty();
+        let name = if message { self.toast_text } else { self.screen.name() };
         let tw = (fonts::TITLE.width(name, 0) + 48) as f32;
         let (x, y) = ((W as f32 - tw) / 2.0, H as f32 - 92.0);
         c.round_rect(x, y, tw, 64.0, 0.0, theme::BG.mix(theme::GREY, 0.7), 0.92 * a);
-        c.text_centered(&fonts::TITLE, name, W as f32 / 2.0, y + 24.0, TEXT, a);
+        c.text_centered(&fonts::TITLE, name, W as f32 / 2.0, y + if message { 32.0 } else { 24.0 }, TEXT, a);
+        if message {
+            return;
+        }
         for (i, s) in Screen::ALL.iter().enumerate() {
             let on = *s == self.screen;
             let x = W as f32 / 2.0 + (i as f32 - 1.0) * 14.0;
@@ -167,7 +181,9 @@ impl Ui {
             }
             changed = true;
         }
-        if st.summary.is_some() && !self.touching && now.wrapping_sub(self.summary_opened_ms) > SUMMARY_TIMEOUT_MS {
+        let asking = st.summary.as_ref().is_some_and(|s| st.question_for(&s.id).is_some());
+        let timeout = if asking { QUESTION_TIMEOUT_MS } else { SUMMARY_TIMEOUT_MS };
+        if st.summary.is_some() && !self.touching && now.wrapping_sub(self.summary_opened_ms) > timeout {
             st.summary = None;
             changed = true;
         }
@@ -181,7 +197,9 @@ impl Ui {
         self.screen = self.screen.next();
         st.summary = None;
         self.pressed = None;
+        self.pressed_option = None;
         self.toast_ms = Some(now);
+        self.toast_text = "";
     }
 
     fn tile_at(&self, st: &State, x: i32, y: i32, now: u32) -> Option<usize> {
@@ -208,6 +226,7 @@ impl Ui {
                 self.touch_start = (x, y);
                 self.touch_start_ms = now;
                 self.pressed = self.tile_at(st, x, y, now);
+                self.pressed_option = option_at(st, x, y, now);
                 (None, true)
             }
             (Some((x, y)), true) => self.finger_moved(st, x, y, now),
@@ -231,8 +250,10 @@ impl Ui {
             self.page_x = dx;
             return (None, true);
         }
-        if !self.held && self.pressed.is_some() && ((x - sx).abs() > SLOP_PX || (y - sy).abs() > SLOP_PX) {
+        let slid = (x - sx).abs() > SLOP_PX || (y - sy).abs() > SLOP_PX;
+        if !self.held && (self.pressed.is_some() || self.pressed_option.is_some()) && slid {
             self.pressed = None; // finger slid off: cancel the tap
+            self.pressed_option = None;
             return (None, true);
         }
         if let Some(i) = self.pressed.filter(|_| !self.held && now.wrapping_sub(self.touch_start_ms) > HOLD_MS) {
@@ -242,6 +263,7 @@ impl Ui {
             self.summary_opened_ms = now;
             let msg = summary_msg(&id);
             st.summary = Some(Summary { id, ..Default::default() });
+            st.question = None; // until the Mac says what is on screen now
             return (Some(msg), true);
         }
         (None, false)
@@ -260,16 +282,30 @@ impl Ui {
                 self.page_x -= W as f32;
             }
         } else if let Some(id) = st.summary.as_ref().filter(|_| !self.held).map(|s| s.id.clone()) {
-            if self.touch_start.1 >= summary::OPEN_BUTTON_Y {
+            let q = st.question_for(&id);
+            let open_y = if q.is_some() { summary::Q_OPEN_BUTTON_Y } else { summary::OPEN_BUTTON_Y };
+            let (tx, ty) = self.touch_start;
+            // started on an option: answer it, or nothing if the finger slid off
+            let on_option = q.and_then(|q| summary::option_at(q.options.len(), tx, ty)).is_some();
+            let chosen = self.pressed_option.and_then(|k| q?.options.get(k));
+            let answer = chosen.map(|(n, label)| answer_msg(&id, *n, label));
+            if let Some(m) = answer {
+                msg = Some(m);
+                st.question = None; // until the Mac sends what comes next
+                self.summary_opened_ms = now;
+                self.toast_text = "Respuesta enviada";
+                self.toast_ms = Some(now);
+            } else if !on_option && ty >= open_y {
                 msg = Some(self.open(&id, now));
                 st.summary = None;
-            } else if now.wrapping_sub(self.summary_opened_ms) > 300 {
+            } else if !on_option && now.wrapping_sub(self.summary_opened_ms) > 300 {
                 st.summary = None;
             }
         } else if let Some(i) = self.pressed.filter(|_| !self.held) {
             msg = Some(self.open(&st.sessions[i].id.clone(), now));
         }
         self.pressed = None;
+        self.pressed_option = None;
         self.swiping = false;
         self.held = false;
         msg
@@ -280,6 +316,13 @@ impl Ui {
         self.flash_ms = now;
         open_msg(id)
     }
+}
+
+/// Option button of the open summary's question under (x, y).
+fn option_at(st: &State, x: i32, y: i32, now: u32) -> Option<usize> {
+    let sum = st.summary.as_ref().filter(|_| st.linked(now))?;
+    let q = st.question_for(&sum.id)?;
+    summary::option_at(q.options.len(), x, y)
 }
 
 fn draw_centered(c: &mut Canvas, a: &str, b: Option<&str>) {

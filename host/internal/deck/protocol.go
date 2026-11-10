@@ -3,6 +3,7 @@ package deck
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/sverdejot/agent-deck/host/internal/claude"
@@ -17,6 +18,10 @@ const (
 	maxMeta   = 150
 	maxText   = 600
 	maxString = 100
+
+	maxQuestion = 300
+	maxOption   = 80 // label of each option
+	maxOptions  = 6
 )
 
 // Snapshot is the full list of sessions: B, one S per session, E.
@@ -36,6 +41,47 @@ func Snapshot(sessions []claude.Session, ctx func(claude.Session) int) string {
 func SummaryLine(id string, sum claude.Summary) string {
 	return fmt.Sprintf("Y\t%s\t%s\t%s\t%s\t%s\n",
 		Clean(id, maxID), Clean(sum.Meta, maxMeta), Clean(sum.You, maxText), Clean(sum.Claude, maxText), Clean(sum.Tool, maxMeta))
+}
+
+// QuestionLine tells the deck what session id is waiting on: the menu's question and options
+// ("Q id question 1.label 2.label…"), or just "Q id" when there is nothing to answer.
+func QuestionLine(id string, p claude.Prompt) string {
+	var opts []string
+	for _, o := range p.Options {
+		if label := OptionLabel(o.Label); o.N >= 1 && o.N <= 9 && label != "" && len(opts) < maxOptions {
+			opts = append(opts, fmt.Sprintf("%d.%s", o.N, label))
+		}
+	}
+	q := strings.TrimSpace(Clean(p.Question, maxQuestion))
+	if q == "" || len(opts) == 0 {
+		return "Q\t" + Clean(id, maxID) + "\n"
+	}
+	return "Q\t" + Clean(id, maxID) + "\t" + q + "\t" + strings.Join(opts, "\t") + "\n"
+}
+
+// OptionLabel is an option's label as the deck gets it in Q, and sends back in A.
+func OptionLabel(s string) string {
+	return strings.TrimSpace(Clean(strings.TrimSpace(s), maxOption))
+}
+
+// Answer is the option the deck picked for a pending question.
+type Answer struct {
+	ID    string
+	N     int
+	Label string
+}
+
+// ParseAnswer reads an A line from the deck: "A id n label".
+func ParseAnswer(line string) (Answer, bool) {
+	f := strings.SplitN(line, "\t", 4)
+	if len(f) != 4 || f[0] != "A" || f[1] == "" {
+		return Answer{}, false
+	}
+	n, err := strconv.Atoi(f[2])
+	if err != nil || n < 1 || n > 9 {
+		return Answer{}, false
+	}
+	return Answer{ID: f[1], N: n, Label: strings.TrimSpace(f[3])}, true
 }
 
 // LimitsLine feeds the Limits screen.

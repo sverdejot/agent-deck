@@ -99,3 +99,54 @@ fn button_cycles_screens() {
         .collect();
     assert_eq!(names, [Screen::Sessions, Screen::Limits, Screen::Usage, Screen::Sessions]);
 }
+
+/// The waiting session's summary open, with a permission prompt pending.
+fn asking() -> (State, Ui) {
+    let mut st = sample();
+    let mut ui = ui_for(&st);
+    ui.touch(&mut st, Some((400, 60)), NOW); // third tile: "wait"
+    let (msg, _) = ui.touch(&mut st, Some((400, 60)), NOW + 700);
+    assert_eq!(msg.as_deref(), Some("R\tcli:2\n"));
+    ui.touch(&mut st, None, NOW + 800);
+    let q = "Q\tcli:2\trm -rf build - Do you want to proceed?\t1.Yes\t2.Yes, and don't ask again\t3.No\n";
+    st.feed(q.as_bytes(), NOW + 900);
+    assert!(st.question_for("cli:2").is_some());
+    (st, ui)
+}
+
+#[test]
+fn question_summary_renders_in_bands() {
+    let (mut st, ui) = asking();
+    let full = render(&ui, &st, NOW + 1000);
+    assert!(full == render_banded(&ui, &st, NOW + 1000, 80));
+    st.question = None;
+    assert!(full != render(&ui, &st, NOW + 1000), "the question changes the summary");
+}
+
+#[test]
+fn tapping_an_option_answers_it() {
+    let (mut st, mut ui) = asking();
+    // three options stacked above "Abrir sesión": the second one is around y = 318
+    assert_eq!(ui.touch(&mut st, Some((240, 318)), NOW + 2000).0, None);
+    let (msg, _) = ui.touch(&mut st, None, NOW + 2100);
+    assert_eq!(msg.as_deref(), Some("A\tcli:2\t2\tYes, and don't ask again\n"));
+    assert!(st.question.is_none(), "cleared until the Mac sends the next one");
+    assert!(st.summary.is_some(), "the summary stays open");
+}
+
+#[test]
+fn sliding_off_an_option_does_nothing() {
+    let (mut st, mut ui) = asking();
+    ui.touch(&mut st, Some((240, 318)), NOW + 2000);
+    ui.touch(&mut st, Some((240, 360)), NOW + 2050);
+    assert_eq!(ui.touch(&mut st, None, NOW + 2100).0, None);
+    assert!(st.question.is_some() && st.summary.is_some());
+}
+
+#[test]
+fn open_button_still_works_with_a_question() {
+    let (mut st, mut ui) = asking();
+    ui.touch(&mut st, Some((240, 450)), NOW + 2000);
+    assert_eq!(ui.touch(&mut st, None, NOW + 2100).0.as_deref(), Some("O\tcli:2\n"));
+    assert!(st.summary.is_none());
+}

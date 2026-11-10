@@ -1,7 +1,7 @@
 mod common;
 
 use common::{snapshot, state_with, NOW};
-use deck_ui::protocol::{open_msg, summary_msg, State, Summary, LINK_TIMEOUT_MS};
+use deck_ui::protocol::{answer_msg, open_msg, summary_msg, State, Summary, LINK_TIMEOUT_MS, MAX_OPTIONS};
 
 #[test]
 fn snapshot_replaces_sessions() {
@@ -65,6 +65,40 @@ fn summary_only_fills_the_one_requested() {
 }
 
 #[test]
+fn question_only_for_the_open_summary() {
+    let mut st = state_with(&[("wait", "A", "esp", "", 0)]);
+    let q = "Q\tcli:0\t¿Qué base de datos?\t1.Postgres\t2.SQLite\t4.Ninguna\n";
+    st.feed(q.as_bytes(), NOW);
+    assert!(st.question.is_none(), "no summary open");
+
+    st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
+    st.feed(b"Q\tcli:9\tOtra\t1.Si\n", NOW);
+    assert!(st.question_for("cli:0").is_none(), "another session");
+    let ch = st.feed(q.as_bytes(), NOW);
+    assert!(ch.summary);
+    let got = st.question_for("cli:0").unwrap();
+    assert_eq!(got.text, "¿Qué base de datos?");
+    assert_eq!(got.options, vec![(1, "Postgres".into()), (2, "SQLite".into()), (4, "Ninguna".into())]);
+    assert!(!st.feed(q.as_bytes(), NOW).summary, "same question: nothing to redraw");
+
+    st.feed(b"Q\tcli:0\n", NOW);
+    assert!(st.question_for("cli:0").is_none(), "cleared");
+}
+
+#[test]
+fn question_options_are_checked_and_capped() {
+    let mut st = state_with(&[("wait", "A", "esp", "", 0)]);
+    st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
+    st.feed(b"Q\tcli:0\tSolo basura\tsin numero\t0.Cero\t10.Diez\t3.\n", NOW);
+    assert!(st.question.is_none(), "no valid option, no question");
+    st.feed(b"Q\tcli:0\tMuchas\t1.a\t2.b\t3.c\t4.d\t5.e\t6.f\t7.g\t8.h\n", NOW);
+    assert_eq!(st.question.as_ref().unwrap().options.len(), MAX_OPTIONS);
+    // a label may itself contain dots: only the first one separates the number
+    st.feed(b"Q\tcli:0\tVersion\t1.v1.2.3\n", NOW);
+    assert_eq!(st.question.as_ref().unwrap().options, vec![(1, "v1.2.3".into())]);
+}
+
+#[test]
 fn limits_line() {
     let mut st = State::default();
     st.feed(b"L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo no llegas al limite\tahora\n", NOW);
@@ -91,4 +125,5 @@ fn usage_block_is_committed_on_end() {
 fn outgoing_messages() {
     assert_eq!(open_msg("cli:abc"), "O\tcli:abc\n");
     assert_eq!(summary_msg("cli:abc"), "R\tcli:abc\n");
+    assert_eq!(answer_msg("cli:abc", 2, "SQLite"), "A\tcli:abc\t2\tSQLite\n");
 }

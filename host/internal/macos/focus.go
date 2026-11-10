@@ -1,5 +1,5 @@
 // Package macos does the Mac-side actions: bringing a terminal session to the front (tmux +
-// Ghostty), and installing agent-deck (binary, LaunchAgent).
+// Ghostty), answering its menus through tmux, and installing agent-deck (binary, LaunchAgent).
 package macos
 
 import (

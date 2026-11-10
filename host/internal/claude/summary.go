@@ -28,10 +28,12 @@ type transcriptLine struct {
 }
 
 type contentBlock struct {
-	Type  string          `json:"type"`
-	Text  string          `json:"text"`
-	Name  string          `json:"name"`
-	Input json.RawMessage `json:"input"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	ID        string          `json:"id"`          // tool_use
+	ToolUseID string          `json:"tool_use_id"` // tool_result
 }
 
 // Summarize reads the session's transcript.

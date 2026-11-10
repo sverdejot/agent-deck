@@ -75,3 +75,48 @@ func TestSummaryLine(t *testing.T) {
 		t.Errorf("SummaryLine = %q", got)
 	}
 }
+
+func TestQuestionLine(t *testing.T) {
+	p := claude.Prompt{
+		Question: "rm -rf build · Do you want\tto proceed?",
+		Options:  []claude.Option{
+			{N: 1, Label: "Yes"},
+			{N: 2, Label: strings.Repeat("ñ", 50)}, // 100 bytes: cut to 80 on a character boundary
+			{N: 3, Label: "No, and tell Claude what to do differently"},
+		},
+	}
+	want := "Q\tcli:1\trm -rf build · Do you want to proceed?\t1.Yes\t2." + strings.Repeat("ñ", 40) +
+		"\t3.No, and tell Claude what to do differently\n"
+	if got := QuestionLine("cli:1", p); got != want {
+		t.Errorf("QuestionLine =\n%q\nwant\n%q", got, want)
+	}
+	if got := QuestionLine("cli:1", claude.Prompt{}); got != "Q\tcli:1\n" {
+		t.Errorf("no menu: %q", got)
+	}
+
+	var many []claude.Option
+	for n := 1; n <= 12; n++ {
+		many = append(many, claude.Option{N: n, Label: "x"})
+	}
+	got := QuestionLine("cli:1", claude.Prompt{Question: "¿?", Options: many})
+	if want := "Q\tcli:1\t¿?\t1.x\t2.x\t3.x\t4.x\t5.x\t6.x\n"; got != want {
+		t.Errorf("at most 6 options: %q", got)
+	}
+}
+
+func TestParseAnswer(t *testing.T) {
+	a, ok := ParseAnswer("A\tcli:1\t2\tYes, and don't ask again")
+	if !ok || a != (Answer{ID: "cli:1", N: 2, Label: "Yes, and don't ask again"}) {
+		t.Errorf("ParseAnswer = %+v, %v", a, ok)
+	}
+	for _, bad := range []string{"A\tcli:1\t2", "A\tcli:1\tdos\tYes", "A\tcli:1\t0\tYes", "A\t\t1\tYes", "R\tcli:1\t1\tYes"} {
+		if _, ok := ParseAnswer(bad); ok {
+			t.Errorf("ParseAnswer(%q) accepted", bad)
+		}
+	}
+	// what the deck sends back is what it got
+	label := OptionLabel(strings.Repeat("ñ", 50) + " ")
+	if a, ok := ParseAnswer("A\tcli:1\t2\t" + label); !ok || a.Label != label {
+		t.Errorf("round trip: %q", a.Label)
+	}
+}

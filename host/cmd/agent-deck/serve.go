@@ -21,6 +21,8 @@ const (
 	keepaliveEvery = 3 * time.Second  // …and at least this often, so the deck knows we're here
 	slowEvery      = 20 * time.Second // Limits and Usage change slowly
 	retryEvery     = 2 * time.Second
+	watchFor       = 65 * time.Second        // the deck closes a summary after 30-60 s
+	answerPause    = 1500 * time.Millisecond // after an answer, let Claude Code move on before looking again
 )
 
 // run waits for the deck, serves it while connected, and starts over when it goes away.
@@ -65,6 +67,14 @@ type conn struct {
 	last   string
 	sentAt time.Time
 	slowAt time.Time
+
+	// the menu (question) of the session whose summary is open on the deck; serve loop only
+	watch      string        // session id, "" none
+	watchUntil time.Time     // the deck has closed the summary by then
+	qPause     time.Time     // just answered: no looking until then
+	qLine      string        // last Q sent
+	qKey       string        // Key of the menu on screen it was built from
+	qSent      claude.Prompt // what it offered
 }
 
 func (c *conn) write(s string) error {
@@ -130,6 +140,9 @@ func (c *conn) serve() error {
 			if err := c.send(false); err != nil {
 				return err
 			}
+			if err := c.pollQuestion(); err != nil {
+				return err
+			}
 			if _, err := os.Stat(c.name); err != nil {
 				return fmt.Errorf("puerto desaparecido")
 			}
@@ -141,8 +154,8 @@ func (c *conn) serve() error {
 	}
 }
 
-// handle reacts to a line from the deck: H (hello), O id (open), R id (summary). Anything else
-// (boot messages, D stats) is ignored.
+// handle reacts to a line from the deck: H (hello), O id (open), R id (summary), A id n label
+// (answer). Anything else (boot messages, D stats) is ignored.
 func (c *conn) handle(l string) error {
 	cmd, id, _ := strings.Cut(l, "\t")
 	switch cmd {
@@ -151,7 +164,12 @@ func (c *conn) handle(l string) error {
 	case "R":
 		if s, ok := c.find(id); ok {
 			go func() { _ = c.write(deck.SummaryLine(s.ID, claude.Summarize(s))) }()
+			c.watch, c.watchUntil = s.ID, time.Now().Add(watchFor)
+			c.qLine, c.qKey, c.qSent = "", "", claude.Prompt{}
+			return c.pollQuestion()
 		}
+	case "A":
+		c.answer(l)
 	case "O":
 		s, ok := c.find(id)
 		if !ok {
@@ -166,4 +184,85 @@ func (c *conn) handle(l string) error {
 		}()
 	}
 	return nil
+}
+
+// pollQuestion sends Q when the menu the watched session waits on changes (or goes away). The
+// menu is read from its tmux pane, so sessions outside tmux never get one.
+func (c *conn) pollQuestion() error {
+	now := time.Now()
+	if c.watch == "" || now.After(c.watchUntil) {
+		c.watch = ""
+		return nil
+	}
+	if now.Before(c.qPause) {
+		return nil
+	}
+	var p claude.Prompt
+	key := ""
+	if s, ok := c.find(c.watch); ok && s.TmuxPane != "" {
+		if m, ok := menuOn(s.TmuxPane); ok {
+			key = m.Key()
+			if key == c.qKey {
+				p = c.qSent // unchanged: skip reading the transcript again
+			} else {
+				p = claude.Enrich(s, m)
+			}
+		}
+	}
+	c.qKey, c.qSent = key, p
+	line := deck.QuestionLine(c.watch, p)
+	if line == c.qLine {
+		return nil
+	}
+	c.qLine = line
+	if c.verbose {
+		log.Printf("pregunta: %q", strings.TrimSpace(line))
+	}
+	return c.write(line)
+}
+
+// answer types the option the deck picked into the session's pane, if the menu it was offered
+// from is still on screen.
+func (c *conn) answer(line string) {
+	a, ok := deck.ParseAnswer(line)
+	if !ok {
+		return
+	}
+	s, ok := c.find(a.ID)
+	if !ok || s.TmuxPane == "" || a.ID != c.watch {
+		log.Printf("responder %s: no encontrada", a.ID)
+		return
+	}
+	c.watchUntil = time.Now().Add(watchFor)
+	c.qLine = "" // the deck dropped its copy: send it what is on screen next, even if it looks the same
+	m, ok := menuOn(s.TmuxPane)
+	if !ok || m.Key() != c.qKey || !offered(c.qSent, a) {
+		log.Printf("responder %s: la pregunta ya no está en pantalla", s.Title)
+		return
+	}
+	if err := macos.Answer(s.TmuxPane, a.N); err != nil {
+		log.Printf("responder %s: %v", s.Title, err)
+		return
+	}
+	log.Printf("respuesta %d (%s) a %s", a.N, a.Label, s.Title)
+	c.qPause = time.Now().Add(answerPause)
+}
+
+// menuOn is the menu Claude Code is waiting on in a tmux pane.
+func menuOn(pane string) (claude.Prompt, bool) {
+	screen, err := macos.Screen(pane)
+	if err != nil {
+		return claude.Prompt{}, false
+	}
+	return claude.ParseMenu(screen)
+}
+
+// offered: a is one of the options of p, as the deck got it.
+func offered(p claude.Prompt, a deck.Answer) bool {
+	for _, o := range p.Options {
+		if o.N == a.N && deck.OptionLabel(o.Label) == a.Label {
+			return true
+		}
+	}
+	return false
 }

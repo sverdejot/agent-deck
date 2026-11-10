@@ -159,6 +159,16 @@ fn main() {
     ui.layout(&st);
     save(&render(&ui, &st), "summary");
 
+    // holding a session that waits on Claude's question: the options, ready to tap
+    let mut st = state(&SESSIONS[..4]);
+    st.summary = Some(Summary { id: "cli:2".into(), loaded: true, ..Default::default() });
+    let question = "Q\tcli:2\t¿Dónde guardo los iconos de la PWA?\t1.En /static, servidos por Glance\t\
+                    2.En un bucket de S3 con su propia caché\t3.Generarlos en el build\n";
+    st.feed(question.as_bytes(), NOW);
+    let mut ui = Ui::new();
+    ui.layout(&st);
+    save(&render(&ui, &st), "summary-question");
+
     let mut st = state(&SESSIONS[..3]);
     let mut ui = Ui::new();
     ui.layout(&st);
