@@ -19,9 +19,9 @@ const (
 	maxText   = 600
 	maxString = 100
 
-	maxQuestion = 300
-	maxOption   = 80 // label of each option
-	maxOptions  = 6
+	maxQuestion  = 300
+	maxOption    = 80 // label of each option
+	maxOptions   = 6
 	maxAgents    = 8 // subagents listed (the deck keeps no more)
 	maxAgentType = 40
 	maxAgentDesc = 120

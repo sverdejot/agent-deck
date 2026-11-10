@@ -79,7 +79,7 @@ func TestSummaryLine(t *testing.T) {
 func TestQuestionLine(t *testing.T) {
 	p := claude.Prompt{
 		Question: "rm -rf build · Do you want\tto proceed?",
-		Options:  []claude.Option{
+		Options: []claude.Option{
 			{N: 1, Label: "Yes"},
 			{N: 2, Label: strings.Repeat("ñ", 50)}, // 100 bytes: cut to 80 on a character boundary
 			{N: 3, Label: "No, and tell Claude what to do differently"},

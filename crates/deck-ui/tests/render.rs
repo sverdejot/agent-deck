@@ -58,23 +58,23 @@ fn tile_colours_follow_state() {
     let st = sample();
     let frame = render(&ui_for(&st), &st, NOW);
     assert_eq!(pixel(&frame, 2, 2), BG.pack(), "margin");
-    // 5 sessions → 3x2: busy top-left is solid orange, idle tiles are grey inside
+    // 5 sessions → 2x3: busy top-left is solid orange, idle tiles are grey inside
     assert_eq!(pixel(&frame, 60, 60), ORANGE.pack());
     assert_eq!(pixel(&frame, 60, 300), GREY.pack());
 }
 
 #[test]
 fn subagent_badge_on_the_tile() {
-    // 5 sessions → 3x2; the first tile (busy) is 147 px wide with 14 px of padding, so the badge
-    // ends at x = 143 and is centred on y = 31; its right end is plain badge colour
+    // 5 sessions → 2 columns x 3 rows; the first tile (busy) is 225 px wide with 20 px of padding,
+    // so the badge ends at x = 215 and is centred on y = 37; its right end is plain badge colour
     let mut st = sample();
     let without = render(&ui_for(&st), &st, NOW);
-    assert_eq!(pixel(&without, 139, 31), ORANGE.pack());
+    assert_eq!(pixel(&without, 211, 37), ORANGE.pack());
     // the same snapshot, with 2 subagents on the first session
     st.feed(snapshot(&SAMPLE).replacen("\t30\n", "\t30\t2\n", 1).as_bytes(), NOW);
     assert_eq!(st.sessions[0].agents, 2);
     let with = render(&ui_for(&st), &st, NOW);
-    assert_eq!(pixel(&with, 139, 31), ORANGE_DEEP.pack());
+    assert_eq!(pixel(&with, 211, 37), ORANGE_DEEP.pack());
 }
 
 #[test]
@@ -107,8 +107,8 @@ fn tap_opens_and_hold_requests_summary() {
     assert_eq!(ui.touch(&mut st, Some((60, 60)), NOW).0, None);
     assert_eq!(ui.touch(&mut st, None, NOW + 100).0.as_deref(), Some("O\tcli:0\n"));
     // hold the second one
-    ui.touch(&mut st, Some((240, 60)), NOW + 1000);
-    let (msg, _) = ui.touch(&mut st, Some((240, 60)), NOW + 1700);
+    ui.touch(&mut st, Some((300, 60)), NOW + 1000);
+    let (msg, _) = ui.touch(&mut st, Some((300, 60)), NOW + 1700);
     assert_eq!(msg.as_deref(), Some("R\tcli:1\n"));
     assert_eq!(st.summary.as_ref().map(|s| s.id.as_str()), Some("cli:1"));
     // releasing after the hold doesn't also open it
@@ -142,8 +142,8 @@ fn button_cycles_screens() {
 fn asking() -> (State, Ui) {
     let mut st = sample();
     let mut ui = ui_for(&st);
-    ui.touch(&mut st, Some((400, 60)), NOW); // third tile: "wait"
-    let (msg, _) = ui.touch(&mut st, Some((400, 60)), NOW + 700);
+    ui.touch(&mut st, Some((100, 240)), NOW); // third tile: "wait"
+    let (msg, _) = ui.touch(&mut st, Some((100, 240)), NOW + 700);
     assert_eq!(msg.as_deref(), Some("R\tcli:2\n"));
     ui.touch(&mut st, None, NOW + 800);
     let q = "Q\tcli:2\trm -rf build - Do you want to proceed?\t1.Yes\t2.Yes, and don't ask again\t3.No\n";
@@ -156,7 +156,7 @@ fn asking() -> (State, Ui) {
 fn question_summary_renders_in_bands() {
     let (mut st, ui) = asking();
     let full = render(&ui, &st, NOW + 1000);
-    assert!(full == render_banded(&ui, &st, NOW + 1000, 80));
+    assert!(full == render_banded(&ui, &st, NOW + 1000, 80), "summary with a question, bands of 80");
     st.question = None;
     assert!(full != render(&ui, &st, NOW + 1000), "the question changes the summary");
 }

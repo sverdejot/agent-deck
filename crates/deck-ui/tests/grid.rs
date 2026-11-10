@@ -45,11 +45,13 @@ fn tiles_stay_on_screen_whole_pixels_and_never_overlap() {
 
 #[test]
 fn short_last_row_keeps_tile_size_and_leaves_empty_slots() {
-    for n in [5, 7, 8] {
-        let first = session_rect(n, 0);
-        let last = session_rect(n, n - 1);
-        assert_eq!((last.w, last.h), (first.w, first.h), "n = {n}");
-        assert_eq!(last.x, first.x, "n = {n}: the last row starts at the left");
+    // (sessions, columns): the last tile sits right under the one above it, same size (give or
+    // take the pixel lost to rounding)
+    for (n, cols) in [(5, 2), (7, 3), (8, 3)] {
+        let (last, above) = (session_rect(n, n - 1), session_rect(n, n - 1 - cols));
+        assert_eq!(last.x, above.x, "n = {n}");
+        assert!(last.y > above.y, "n = {n}");
+        assert!((last.w - above.w).abs() <= 1.0 && (last.h - above.h).abs() <= 1.0, "n = {n}: {last:?} vs {above:?}");
     }
     assert_eq!(slot_count(5, 5), 6);
     assert_eq!(slot_count(7, 7), 9);

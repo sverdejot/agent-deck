@@ -96,7 +96,7 @@ func TestParseMenu(t *testing.T) {
 	}{
 		{"permission", screenPermission, Prompt{
 			Question: "rm -rf build · Do you want to proceed?",
-			Options:  []Option{
+			Options: []Option{
 				{1, "Yes"},
 				{2, "Yes, and don't ask again for rm commands in /Users/sam/esp"},
 				{3, "No, and tell Claude what to do differently"},
@@ -108,7 +108,7 @@ func TestParseMenu(t *testing.T) {
 		}, true},
 		{"plan approval", screenPlan, Prompt{
 			Question: "Would you like to proceed?",
-			Options:  []Option{
+			Options: []Option{
 				{1, "Yes, and auto-accept edits"},
 				{2, "Yes, and manually approve edits"},
 				{3, "No, keep planning"},

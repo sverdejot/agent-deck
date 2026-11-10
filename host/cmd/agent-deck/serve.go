@@ -23,8 +23,8 @@ const (
 	retryEvery     = 2 * time.Second
 	watchFor       = 65 * time.Second        // the deck closes a summary after 30-60 s
 	answerPause    = 1500 * time.Millisecond // after an answer, let Claude Code move on before looking again
-	agentsEvery    = 2 * time.Second  // subagents of the open summary are refreshed this often…
-	summaryFor     = 30 * time.Second // …for as long as the deck keeps a summary open
+	agentsEvery    = 2 * time.Second         // subagents of the open summary are refreshed this often…
+	summaryFor     = 30 * time.Second        // …for as long as the deck keeps a summary open
 )
 
 // run waits for the deck, serves it while connected, and starts over when it goes away.
