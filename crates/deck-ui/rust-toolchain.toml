@@ -1,0 +1,5 @@
+# Host toolchain for building and testing the UI crate on the Mac (and in CI).
+# The firmware compiles this same crate with its own Xtensa toolchain (../../firmware).
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]
