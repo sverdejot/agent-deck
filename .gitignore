@@ -1,0 +1,10 @@
+# Rust build output (firmware/.gitignore also ignores ESP-IDF and the espup export)
+target/
+
+# Mac-side binary
+/host/agent-deck
+
+# machine-local overrides (e.g. ESPFLASH_PORT)
+mise.local.toml
+
+.DS_Store

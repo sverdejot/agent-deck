@@ -1,0 +1,5 @@
+# Shared by every Rust crate in the repo (rustfmt looks up parent directories).
+edition = "2021"
+max_width = 120
+use_small_heuristics = "Max"
+use_field_init_shorthand = true

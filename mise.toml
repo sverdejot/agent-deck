@@ -1,0 +1,80 @@
+# Toolchain for agent-deck. Every version is pinned; mise.lock records the resolved artifacts.
+#
+#   mise install          tools below
+#   mise run setup        Xtensa Rust toolchain for the ESP32-S3 (espup)
+#   mise tasks            everything else
+#
+# Rust itself is NOT managed here on purpose: mise's rust plugin exports RUSTUP_TOOLCHAIN, which
+# would override firmware/rust-toolchain.toml (the "esp" Xtensa toolchain). rustup reads the
+# toolchain from that file instead.
+
+[settings]
+lockfile = true
+
+[tools]
+go = "1.27.3"
+"cargo:espup" = "0.19.0"
+"cargo:espflash" = "4.7.0"
+"cargo:ldproxy" = "0.3.5"
+
+[env]
+# serial port of the Indicator's ESP32-S3 (CH340), found at run time; override in mise.local.toml
+ESPFLASH_PORT = "{{ exec(command='ls /dev/cu.usbserial-* 2>/dev/null | head -1') }}"
+# LIBCLANG_PATH and the Xtensa GCC on PATH, written by `mise run setup`
+_.source = { path = "firmware/.espup/export-esp.sh", tools = true }
+
+[vars]
+esp_toolchain = "1.98.1.0"
+
+[tasks.setup]
+description = "Install the pinned Xtensa Rust toolchain (rustup toolchain \"esp\")"
+run = "espup install --toolchain-version {{vars.esp_toolchain}} --targets esp32s3 --export-file firmware/.espup/export-esp.sh"
+
+[tasks."fw:build"]
+description = "Build the firmware (release)"
+dir = "firmware"
+run = "cargo build --release"
+
+[tasks."fw:flash"]
+description = "Build and flash the firmware (stop agent-deck first: it holds the serial port)"
+dir = "firmware"
+run = "cargo run --release"
+
+[tasks."fw:monitor"]
+description = "Serial monitor (raw protocol + panics)"
+run = "espflash monitor --baud 115200"
+
+[tasks."fw:fmt"]
+description = "Check formatting and lints"
+dir = "firmware"
+run = ["cargo fmt --check", "cargo clippy --release -- -D warnings"]
+
+[tasks."host:build"]
+description = "Build the Mac-side program"
+dir = "host"
+run = "go build -o agent-deck ./cmd/agent-deck"
+
+[tasks."host:test"]
+description = "Vet and test the Mac-side program"
+dir = "host"
+run = ["test -z \"$(gofmt -l .)\" || (gofmt -l . && exit 1)", "go vet ./...", "go test ./..."]
+
+[tasks."ui:test"]
+description = "Format check, lints and tests of the UI crate (runs on the Mac)"
+dir = "crates/deck-ui"
+run = ["cargo fmt --check", "cargo clippy --all-targets -- -D warnings", "cargo test"]
+
+[tasks."ui:snapshots"]
+description = "Render every screen to crates/deck-ui/target/snapshots/*.png"
+dir = "crates/deck-ui"
+run = "cargo run --example snapshot"
+
+[tasks.check]
+description = "Everything CI runs"
+depends = ["ui:test", "host:test", "fw:fmt"]
+
+[tasks."host:install"]
+description = "Install the Mac-side program (LaunchAgent + statusline)"
+dir = "host"
+depends = ["host:build"]
+run = ["./agent-deck install-statusline", "./agent-deck install"]
