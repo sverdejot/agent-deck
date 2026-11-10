@@ -20,7 +20,7 @@ const Q_OPEN_CY: f32 = H as f32 - 28.0;
 /// Taps below this line hit "Abrir sesión" when a question is on screen.
 pub const Q_OPEN_BUTTON_Y: i32 = H - 54;
 /// Option rows: flat and square like the tiles, finger-sized, stacked up from above the link.
-const OPTION_H: f32 = 56.0;
+const OPTION_H: f32 = 60.0;
 const OPTION_GAP: f32 = 6.0;
 const OPTIONS_BOTTOM: f32 = (H - 62) as f32;
 const MARGIN: f32 = 24.0;
@@ -135,9 +135,8 @@ fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usiz
     c.text_centered(&fonts::SUB, "Abrir sesión", W as f32 / 2.0, Q_OPEN_CY, MUTED, 1.0);
 }
 
-/// One option: a flat grey row (square, like an idle tile) with its number in orange and the label
-/// (one line in the title font if it fits, else up to two in the small one). Pressed, it turns
-/// solid orange like a working tile.
+/// One option: a flat grey row (square, like an idle tile) with its number in orange and the label,
+/// always in the title font, on up to two lines. Pressed, it turns solid orange like a working tile.
 fn option_row(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
     c.round_rect(r.x, r.y, r.w, r.h, 0.0, if pressed { ORANGE } else { GREY }, 1.0);
     let (fg, accent) = if pressed { (ON_ORANGE, ON_ORANGE) } else { (TEXT, ORANGE) };
@@ -145,11 +144,8 @@ fn option_row(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
 
     let tx = (r.x + 44.0) as i32;
     let tw = (r.w - 44.0 - 14.0) as i32;
-    let (font, lines) = if fonts::TITLE.width(label, 0) <= tw {
-        (&fonts::TITLE, vec![label.to_string()])
-    } else {
-        (&fonts::SUB, wrap(&fonts::SUB, label, tw, 2))
-    };
+    let font = &fonts::TITLE;
+    let lines = wrap(font, label, tw, 2);
     let lh = font.line_height();
     let block = (lines.len() as i32 - 1) * lh + font.ascent;
     let ty = (r.y + r.h / 2.0) as i32 - block / 2 - 1;
