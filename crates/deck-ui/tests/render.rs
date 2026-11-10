@@ -2,7 +2,7 @@ mod common;
 
 use common::{pixel, render, render_banded, snapshot, state_with, NOW};
 use deck_ui::protocol::{State, Summary, LINK_TIMEOUT_MS};
-use deck_ui::ui::theme::{BG, GREY, ORANGE, ORANGE_DEEP};
+use deck_ui::ui::theme::{BG, GREY, ON_ORANGE, ORANGE};
 use deck_ui::ui::{Screen, Ui};
 
 const SAMPLE: [(&str, &str, &str, &str, i32); 5] = [
@@ -64,17 +64,23 @@ fn tile_colours_follow_state() {
 }
 
 #[test]
-fn subagent_badge_on_the_tile() {
+fn subagent_marks_on_the_tile() {
     // 5 sessions → 2 columns x 3 rows; the first tile (busy) is 225 px wide with 20 px of padding,
-    // so the badge ends at x = 215 and is centred on y = 37; its right end is plain badge colour
+    // so the marks sit in its header row, ending at x = 215
+    let marks = |frame: &[u16]| {
+        (190..216)
+            .flat_map(|x| (28..44).map(move |y| (x, y)))
+            .filter(|&(x, y)| pixel(frame, x, y) == ON_ORANGE.pack())
+            .count()
+    };
     let mut st = sample();
     let without = render(&ui_for(&st), &st, NOW);
-    assert_eq!(pixel(&without, 211, 37), ORANGE.pack());
-    // the same snapshot, with 2 subagents on the first session
+    assert_eq!(marks(&without), 0);
+    // the same snapshot, with 2 subagents on the first session: two 7 px squares
     st.feed(snapshot(&SAMPLE).replacen("\t30\n", "\t30\t2\n", 1).as_bytes(), NOW);
     assert_eq!(st.sessions[0].agents, 2);
     let with = render(&ui_for(&st), &st, NOW);
-    assert_eq!(pixel(&with, 211, 37), ORANGE_DEEP.pack());
+    assert_eq!(marks(&with), 2 * 7 * 7);
 }
 
 #[test]

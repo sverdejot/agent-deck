@@ -5,7 +5,7 @@
 
 use super::draw_centered;
 use super::grid::Rect;
-use super::theme::{GREY, MUTED, ON_ORANGE, ORANGE, ORANGE_HI, TEXT};
+use super::theme::{FAINT, GREY, MUTED, ON_ORANGE, ORANGE, TEXT};
 use crate::gfx::{fonts, Canvas, Rgb, H, W};
 use crate::protocol::{Question, Session, State, Subagent, Summary};
 use crate::text::{fit, wrap};
@@ -15,15 +15,14 @@ pub const OPEN_BUTTON_Y: i32 = H - 80;
 /// Rows of the SUBAGENTES block, "+n más" included.
 const AGENT_ROWS: usize = 4;
 
-/// With a question, "Abrir sesión" becomes a smaller, secondary button at the very bottom.
-const Q_OPEN_TOP: i32 = H - 60;
-const Q_OPEN_H: f32 = 48.0;
+/// With a question, "Abrir sesión" becomes a quiet text link at the very bottom.
+const Q_OPEN_CY: f32 = H as f32 - 28.0;
 /// Taps below this line hit "Abrir sesión" when a question is on screen.
-pub const Q_OPEN_BUTTON_Y: i32 = Q_OPEN_TOP - 4;
-/// Option buttons: finger-sized, stacked up from just above "Abrir sesión".
+pub const Q_OPEN_BUTTON_Y: i32 = H - 54;
+/// Option rows: flat and square like the tiles, finger-sized, stacked up from above the link.
 const OPTION_H: f32 = 56.0;
-const OPTION_GAP: f32 = 8.0;
-const OPTIONS_BOTTOM: f32 = 410.0;
+const OPTION_GAP: f32 = 6.0;
+const OPTIONS_BOTTOM: f32 = (H - 62) as f32;
 const MARGIN: f32 = 24.0;
 
 /// Button of option `k` of `n`: one column up to 4 options, two columns beyond.
@@ -109,46 +108,43 @@ fn pill(c: &mut Canvas, s: &Session, x: i32, y: i32) -> i32 {
     lw
 }
 
-/// Claude is waiting on a menu: state and title on one row, the question, one button per option
-/// and a smaller "Abrir sesión" at the bottom.
+/// Claude is waiting on a menu. Laid out like the other screens: a tracked label with the session
+/// on the right, the question in the heading font, then one flat row per option and a quiet
+/// "Abrir sesión" link at the bottom.
 fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usize>) {
     let (x, w) = (MARGIN as i32, W - 2 * MARGIN as i32);
-    let mut y = 22;
-    let lw = pill(c, s, x, y);
-    c.text(&fonts::SUB, &fit(&fonts::SUB, &s.title, w - lw - 12), x + lw + 12, y + 5, MUTED, 0, 1.0);
-    y += 46;
+    let label = "TE NECESITA";
+    c.text(&fonts::TAG, label, x, 22, ORANGE, 2, 1.0);
+    let lw = fonts::TAG.width(label, 2) + 16;
+    let title = fit(&fonts::SUB, &s.title, w - lw);
+    c.text(&fonts::SUB, &title, x + w - fonts::SUB.width(&title, 0), 20, FAINT, 0, 1.0);
 
     let n = q.options.len();
+    let y = 54;
     let options_top = option_rect(n, 0).y as i32;
-    let lh = fonts::TITLE.line_height();
-    let max_lines = usize::try_from((options_top - 12 - y) / lh).unwrap_or(0).max(1);
-    for (l, line) in wrap(&fonts::TITLE, &q.text, w, max_lines).iter().enumerate() {
-        c.text(&fonts::TITLE, line, x, y + l as i32 * lh, TEXT, 0, 1.0);
+    let lh = fonts::HEAD.line_height();
+    let max_lines = usize::try_from((options_top - 16 - y) / lh).unwrap_or(0).max(1);
+    for (l, line) in wrap(&fonts::HEAD, &q.text, w, max_lines).iter().enumerate() {
+        c.text(&fonts::HEAD, line, x, y + l as i32 * lh, TEXT, 0, 1.0);
     }
 
     for (k, (num, label)) in q.options.iter().enumerate() {
-        option_button(c, option_rect(n, k), *num, label, pressed == Some(k));
+        option_row(c, option_rect(n, k), *num, label, pressed == Some(k));
     }
 
-    let top = Q_OPEN_TOP as f32;
-    c.round_rect(MARGIN, top, w as f32, Q_OPEN_H, Q_OPEN_H / 2.0, GREY, 1.0);
-    c.text_centered(&fonts::TITLE, "Abrir sesión", W as f32 / 2.0, top + Q_OPEN_H / 2.0, TEXT, 1.0);
+    c.text_centered(&fonts::SUB, "Abrir sesión", W as f32 / 2.0, Q_OPEN_CY, MUTED, 1.0);
 }
 
-/// One option: its number in orange, then the label (one line in the big font if it fits, else up
-/// to two in the small one), inside an orange-bordered button; solid orange while pressed.
-fn option_button(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
-    if pressed {
-        c.round_rect(r.x, r.y, r.w, r.h, 14.0, ORANGE_HI, 1.0);
-    } else {
-        c.round_rect(r.x, r.y, r.w, r.h, 14.0, ORANGE, 1.0);
-        c.round_rect(r.x + 2.0, r.y + 2.0, r.w - 4.0, r.h - 4.0, 12.0, GREY, 1.0);
-    }
+/// One option: a flat grey row (square, like an idle tile) with its number in orange and the label
+/// (one line in the title font if it fits, else up to two in the small one). Pressed, it turns
+/// solid orange like a working tile.
+fn option_row(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
+    c.round_rect(r.x, r.y, r.w, r.h, 0.0, if pressed { ORANGE } else { GREY }, 1.0);
     let (fg, accent) = if pressed { (ON_ORANGE, ON_ORANGE) } else { (TEXT, ORANGE) };
-    c.text_centered(&fonts::TITLE, &num.to_string(), r.x + 24.0, r.y + r.h / 2.0, accent, 1.0);
+    c.text_centered(&fonts::TITLE, &num.to_string(), r.x + 22.0, r.y + r.h / 2.0, accent, 1.0);
 
     let tx = (r.x + 44.0) as i32;
-    let tw = (r.w - 44.0 - 12.0) as i32;
+    let tw = (r.w - 44.0 - 14.0) as i32;
     let (font, lines) = if fonts::TITLE.width(label, 0) <= tw {
         (&fonts::TITLE, vec![label.to_string()])
     } else {
@@ -162,9 +158,10 @@ fn option_button(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
     }
 }
 
-/// SUBAGENTES: one row per running subagent ("Explore · Buscar el parser", how long it
-/// has been running on the right); with one or two, what each is doing now under it. Never more
-/// than [`AGENT_ROWS`] rows: the rest are counted in a "+n más" row.
+/// SUBAGENTES: one row per running subagent, like the Uso legend: a square marker, what it was
+/// asked to do, and how long it has been running on the right; with one or two, its type and what
+/// it is doing now in grey under it. Never more than [`AGENT_ROWS`] rows: the rest are counted in a
+/// "+n más" row.
 fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents: &[Subagent]) {
     let lh = fonts::SUB.line_height();
     if agents.is_empty() || *y + 20 + lh > bottom {
@@ -175,22 +172,23 @@ fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents
     let room = usize::try_from((bottom - *y) / lh).unwrap_or(0).clamp(1, AGENT_ROWS);
     let shown = if agents.len() > room { (room - 1).max(1) } else { agents.len() };
     let detail = shown == agents.len() && room >= 2 * shown;
-    let indent = 14;
+    let indent = 18;
     for a in &agents[..shown] {
-        c.disc((x + 4) as f32, *y as f32 + fonts::SUB.ascent as f32 * 0.68, 3.0, ORANGE, 1.0);
-        let age_w = if a.age.is_empty() { 0 } else { fonts::SUB.width(&a.age, 0) + 10 };
-        let label = match (a.kind.is_empty(), a.description.is_empty()) {
-            (false, false) => format!("{} · {}", a.kind, a.description),
-            (true, _) => a.description.clone(),
-            (false, true) => a.kind.clone(),
-        };
-        c.text(&fonts::SUB, &fit(&fonts::SUB, &label, w - indent - age_w), x + indent, *y, TEXT, 0, 1.0);
+        c.round_rect(x as f32, (*y + 3) as f32, 10.0, 10.0, 0.0, ORANGE, 1.0);
+        let age_w = if a.age.is_empty() { 0 } else { fonts::SUB.width(&a.age, 0) + 12 };
+        let label = if a.description.is_empty() { &a.kind } else { &a.description };
+        c.text(&fonts::SUB, &fit(&fonts::SUB, label, w - indent - age_w), x + indent, *y, TEXT, 0, 1.0);
         if age_w > 0 {
-            c.text(&fonts::SUB, &a.age, x + w - age_w + 10, *y, MUTED, 0, 1.0);
+            c.text(&fonts::SUB, &a.age, x + w - age_w + 12, *y, MUTED, 0, 1.0);
         }
         *y += lh;
-        if detail && !a.now.is_empty() {
-            c.text(&fonts::SUB, &fit(&fonts::SUB, &a.now, w - indent), x + indent, *y, MUTED, 0, 1.0);
+        let sub = [a.kind.as_str(), a.now.as_str()]
+            .into_iter()
+            .filter(|t| !t.is_empty() && *t != label.as_str())
+            .collect::<Vec<_>>()
+            .join(" · ");
+        if detail && !sub.is_empty() {
+            c.text(&fonts::SUB, &fit(&fonts::SUB, &sub, w - indent), x + indent, *y, FAINT, 0, 1.0);
             *y += lh;
         }
     }

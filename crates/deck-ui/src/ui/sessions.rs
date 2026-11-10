@@ -2,8 +2,8 @@
 //! the state: working = solid orange, needs you = pulsing orange border, ready = orange border,
 //! idle = faint border. Repo in small caps at the top, title anchored to the bottom, age under it,
 //! context-window bar along the bottom edge.
-//! Running subagents show as a small badge at the top right: a parent dot forking into two, and
-//! the count.
+//! Running subagents show at the right of the header row: one small square each (a square and
+//! the count past four).
 
 use super::grid::{self, Rect, PER_PAGE};
 use super::theme::{
@@ -115,8 +115,8 @@ impl Ui {
         if t.show_header {
             c.text(&fonts::TAG, &t.place, x, (r.y + t.pad) as i32, faint, 2, 1.0);
             if s.agents > 0 {
-                let (bg, fg) = if busy { (ORANGE_DEEP, ON_ORANGE) } else { (GREY.mix(ORANGE, 0.22), ORANGE_HI) };
-                draw_badge(c, s.agents, r.x + r.w - t.pad, r.y + t.pad + 7.0, bg, fg);
+                let col = if busy { ON_ORANGE } else { ORANGE };
+                draw_marks(c, s.agents, r.x + r.w - t.pad, r.y + t.pad, col);
             }
         }
         let lh = fonts::TITLE.line_height();
@@ -148,11 +148,12 @@ impl Ui {
     }
 }
 
-const BADGE_H: f32 = 18.0;
-/// Room for the badge's fork icon.
-const BADGE_ICON: f32 = 11.0;
+/// Squares drawn for the subagents of a tile; beyond this the count is written next to one.
+const MARKS: u32 = 4;
+const MARK: f32 = 7.0;
+const MARK_GAP: f32 = 4.0;
 
-fn badge_label(n: u32) -> String {
+fn marks_label(n: u32) -> String {
     if n > 9 {
         "9+".into()
     } else {
@@ -160,24 +161,29 @@ fn badge_label(n: u32) -> String {
     }
 }
 
-/// Width of the subagent badge for `n` subagents.
-fn badge_width(n: u32) -> f32 {
-    7.0 + BADGE_ICON + 4.0 + fonts::TAG.width(&badge_label(n), 0) as f32 + 7.0
+/// Width of the subagent marks for `n` subagents.
+fn marks_width(n: u32) -> f32 {
+    if n <= MARKS {
+        n as f32 * MARK + (n as f32 - 1.0) * MARK_GAP
+    } else {
+        MARK + 5.0 + fonts::TAG.width(&marks_label(n), 1) as f32
+    }
 }
 
-/// Subagent badge: a pill whose right edge is at `right`, centred on `cy`, with a small fork
-/// (one dot branching into two) and the count.
-fn draw_badge(c: &mut Canvas, n: u32, right: f32, cy: f32, bg: Rgb, fg: Rgb) {
-    let w = badge_width(n);
-    let x = right - w;
-    c.round_rect(x, cy - BADGE_H / 2.0, w, BADGE_H, BADGE_H / 2.0, bg, 1.0);
-    let ix = x + 7.0;
-    c.disc(ix + 2.5, cy, 2.5, fg, 1.0);
-    c.disc(ix + 8.5, cy - 3.5, 2.0, fg, 1.0);
-    c.disc(ix + 8.5, cy + 3.5, 2.0, fg, 1.0);
-    let label = badge_label(n);
-    let lx = ix + BADGE_ICON + 4.0 + fonts::TAG.width(&label, 0) as f32 / 2.0;
-    c.text_centered(&fonts::TAG, &label, lx, cy, fg, 1.0);
+/// Subagents at work, at the right of the tile's header row: one small square per subagent (the
+/// legend markers of Uso), or a square and the count when there are more than [`MARKS`]. `y` is
+/// the top of the header text.
+fn draw_marks(c: &mut Canvas, n: u32, right: f32, y: f32, col: Rgb) {
+    let x = right - marks_width(n);
+    let top = y + (fonts::TAG.ascent as f32 - MARK) / 2.0;
+    if n <= MARKS {
+        for k in 0..n {
+            c.round_rect(x + k as f32 * (MARK + MARK_GAP), top, MARK, MARK, 0.0, col, 1.0);
+        }
+    } else {
+        c.round_rect(x, top, MARK, MARK, 0.0, col, 1.0);
+        c.text(&fonts::TAG, &marks_label(n), (x + MARK + 5.0) as i32, y as i32, col, 1, 1.0);
+    }
 }
 
 fn tile_text(s: &Session, r: Rect) -> TileText {
@@ -194,7 +200,7 @@ fn tile_text(s: &Session, r: Rect) -> TileText {
     let top = pad + if show_header { 28.0 } else { 0.0 };
     let bottom = pad + if show_age { (fonts::SUB.line_height() + 2) as f32 } else { 0.0 };
     let max_lines = (((r.h - top - bottom) / fonts::TITLE.line_height() as f32) as usize).clamp(1, 4);
-    let badge = if s.agents > 0 { badge_width(s.agents) as i32 + 6 } else { 0 };
+    let badge = if s.agents > 0 { marks_width(s.agents) as i32 + 10 } else { 0 };
     TileText {
         title: wrap(&fonts::TITLE, &s.title, inner, max_lines),
         place: fit_tracked(&fonts::TAG, &s.place.to_uppercase(), inner - badge, 2),
