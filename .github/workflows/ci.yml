@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to commit SHAs (tag in the comment). Tool versions come from the repo:
+# crates/deck-ui/rust-toolchain.toml, mise.toml (Go, Xtensa toolchain), firmware/.cargo/config.toml (ESP-IDF).
+
+jobs:
+  ui:
+    name: deck-ui (fmt, clippy, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/deck-ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: crates/deck-ui
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: Render screens
+        run: cargo run --example snapshot
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: snapshots
+          path: crates/deck-ui/target/snapshots/*.png
+
+  host:
+    name: host (gofmt, vet, tests)
+    runs-on: macos-latest # syscall, AppleScript and launchctl are macOS-only
+    defaults:
+      run:
+        working-directory: host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: host/go.mod
+          cache-dependency-path: host/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build ./cmd/agent-deck
+
+  firmware:
+    name: firmware (fmt, clippy, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Xtensa toolchain version from mise.toml
+        id: esp
+        working-directory: .
+        run: echo "version=$(sed -n 's/^esp_toolchain = "\(.*\)"/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
+      - uses: esp-rs/xtensa-toolchain@ec6d36527049a7f4fb2cb0c1a644668c1bb8a2a4 # v1.7.0
+        with:
+          default: true
+          buildtargets: esp32s3
+          version: ${{ steps.esp.outputs.version }}
+          ldproxy: true
+      - name: Cache ESP-IDF and build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            firmware/.embuild
+            firmware/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: firmware-${{ runner.os }}-${{ steps.esp.outputs.version }}-${{ hashFiles('firmware/Cargo.lock', 'firmware/sdkconfig.defaults', 'firmware/.cargo/config.toml') }}
+          restore-keys: firmware-${{ runner.os }}-${{ steps.esp.outputs.version }}-
+      - run: cargo fmt --check
+      - run: cargo clippy --release -- -D warnings
+      - run: cargo build --release
