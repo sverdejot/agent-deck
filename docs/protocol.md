@@ -20,7 +20,7 @@ message.
 
 ```
 B
-S  <id> <kind> <state> <title> <place> <age> <ctx>      one per session, oldest first
+S  <id> <kind> <state> <title> <place> <age> <ctx> <agents>   one per session, oldest first
 E
 ```
 
@@ -33,6 +33,7 @@ E
 | `place` | 70 | git repository name (worktrees → main repo), else a short path |
 | `age` | 22 | `ahora`, `hace 5 min`, `hace 3 h`…; empty while `busy` |
 | `ctx` | — | context window used, 0-100; `-1` unknown (optional, defaults to -1) |
+| `agents` | — | subagents running now (optional, defaults to 0; needs `ctx` before it) |
 
 ### Summary — answer to `R`
 
@@ -58,6 +59,27 @@ Claude Code is waiting on: a question (AskUserQuestion), a tool permission or a 
 Do you want to proceed?"). Each `option` is `<n>.<label>` (label ≤ 80), `n` the number Claude Code
 shows (1-9, not necessarily contiguous: options that need typing, like "Type something", are left
 out); at most 6. The deck keeps it only for the summary it has open.
+
+### Subagents of the summary — after `Y`, then refreshed
+
+```
+G  B  <id>                                      start: the list for session <id> follows
+G  S  <id> <type> <description> <age> <now>     one per running subagent, oldest first (≤ 8)
+G  E  <id>                                      commit: replaces the list shown for <id>
+```
+
+Sent right after `Y`, then re-sent whenever it changes (checked every 2 s) for 30 s after the `R` (as long as
+the deck keeps a summary open). An empty block (`G B`, `G E`) clears the list. The deck ignores a
+block for a session whose summary isn't open, and keeps at most 8 entries.
+
+`type` (40): `subagent_type` ("Explore", "general-purpose"). `description` (120): what it was
+launched with. `age` (12): how long it has been running ("40 s", "3 min", "2 h"). `now` (100):
+its last tool call ("Grep: tile_rect"); may be empty, and the field may be missing.
+
+Subagents are read from the session's transcript: a `Task` / `Agent` tool call with no result
+yet (foreground, only while the session is `busy` or `wait`), or a background one whose own
+transcript (`<sessionId>/subagents/agent-*.jsonl`) was written in the last 90 s and that no
+`<task-notification>` has closed. See `host/internal/claude/subagents.go`.
 
 ### Limits — every 20 s
 

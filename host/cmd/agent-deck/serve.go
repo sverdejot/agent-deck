@@ -23,6 +23,8 @@ const (
 	retryEvery     = 2 * time.Second
 	watchFor       = 65 * time.Second        // the deck closes a summary after 30-60 s
 	answerPause    = 1500 * time.Millisecond // after an answer, let Claude Code move on before looking again
+	agentsEvery    = 2 * time.Second  // subagents of the open summary are refreshed this often…
+	summaryFor     = 30 * time.Second // …for as long as the deck keeps a summary open
 )
 
 // run waits for the deck, serves it while connected, and starts over when it goes away.
@@ -63,6 +65,12 @@ type conn struct {
 
 	mu       sync.Mutex
 	sessions []claude.Session // last sent, to resolve the ids the deck sends back
+
+	// the summary the deck asked for last (R), whose subagent list is kept up to date
+	summaryID    string
+	summaryUntil time.Time
+	agentsSent   string
+	agentsAt     time.Time
 
 	last   string
 	sentAt time.Time
@@ -105,6 +113,29 @@ func (c *conn) send(force bool) error {
 	return c.write(msg)
 }
 
+// refreshAgents re-sends the subagents of the summary open on the deck when they changed.
+func (c *conn) refreshAgents() error {
+	c.mu.Lock()
+	id, open, due := c.summaryID, time.Now().Before(c.summaryUntil), time.Since(c.agentsAt) >= agentsEvery
+	c.mu.Unlock()
+	if !open || !due {
+		return nil
+	}
+	s, ok := c.find(id)
+	if !ok {
+		return nil
+	}
+	msg := deck.AgentLines(s.ID, claude.Subagents(s.SessionID, s.State, true))
+	c.mu.Lock()
+	changed := msg != c.agentsSent
+	c.agentsSent, c.agentsAt = msg, time.Now()
+	c.mu.Unlock()
+	if !changed {
+		return nil
+	}
+	return c.write(msg)
+}
+
 func (c *conn) find(id string) (claude.Session, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -140,6 +171,9 @@ func (c *conn) serve() error {
 			if err := c.send(false); err != nil {
 				return err
 			}
+			if err := c.refreshAgents(); err != nil {
+				return err
+			}
 			if err := c.pollQuestion(); err != nil {
 				return err
 			}
@@ -154,8 +188,9 @@ func (c *conn) serve() error {
 	}
 }
 
-// handle reacts to a line from the deck: H (hello), O id (open), R id (summary), A id n label
-// (answer). Anything else (boot messages, D stats) is ignored.
+// handle reacts to a line from the deck: H (hello), O id (open), R id (summary, then its
+// subagents, kept up to date by refreshAgents, and its pending question, by pollQuestion), A id n
+// label (answer). Anything else (boot messages, D stats) is ignored.
 func (c *conn) handle(l string) error {
 	cmd, id, _ := strings.Cut(l, "\t")
 	switch cmd {
@@ -163,7 +198,16 @@ func (c *conn) handle(l string) error {
 		return c.send(true)
 	case "R":
 		if s, ok := c.find(id); ok {
-			go func() { _ = c.write(deck.SummaryLine(s.ID, claude.Summarize(s))) }()
+			c.mu.Lock()
+			c.summaryID, c.summaryUntil, c.agentsAt = s.ID, time.Now().Add(summaryFor), time.Now()
+			c.mu.Unlock()
+			go func() {
+				agents := deck.AgentLines(s.ID, claude.Subagents(s.SessionID, s.State, true))
+				c.mu.Lock()
+				c.agentsSent = agents
+				c.mu.Unlock()
+				_ = c.write(deck.SummaryLine(s.ID, claude.Summarize(s)) + agents)
+			}()
 			c.watch, c.watchUntil = s.ID, time.Now().Add(watchFor)
 			c.qLine, c.qKey, c.qSent = "", "", claude.Prompt{}
 			return c.pollQuestion()

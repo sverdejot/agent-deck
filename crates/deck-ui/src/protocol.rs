@@ -9,6 +9,8 @@ pub const MAX_SERIES: usize = 4;
 pub const MAX_BUCKETS: usize = 96;
 /// Most options of a pending question the deck shows.
 pub const MAX_OPTIONS: usize = 6;
+/// Most subagents kept for the summary (the Mac sends no more than this).
+pub const MAX_AGENTS: usize = 8;
 
 /// Sent until the first snapshot arrives.
 pub const HELLO: &str = "H\n";
@@ -41,6 +43,8 @@ pub struct Session {
     pub age: String,
     /// context window used, 0-100; -1 unknown
     pub ctx: i32,
+    /// subagents running now
+    pub agents: u32,
 }
 
 impl Session {
@@ -62,6 +66,19 @@ impl Session {
     }
 }
 
+/// A subagent running for the session whose summary is open (`G` lines).
+#[derive(Clone, PartialEq, Eq, Default, Debug)]
+pub struct Subagent {
+    /// `Explore`, `general-purpose`…
+    pub kind: String,
+    /// what it was asked, in a few words
+    pub description: String,
+    /// running for: "40 s", "3 min"
+    pub age: String,
+    /// what it is doing now ("Grep: main.rs"); may be empty
+    pub now: String,
+}
+
 #[derive(Default, Debug)]
 pub struct Summary {
     pub id: String,
@@ -70,6 +87,8 @@ pub struct Summary {
     pub you: String,
     pub claude: String,
     pub tool: String,
+    /// running subagents, oldest first
+    pub agents: Vec<Subagent>,
 }
 
 /// A menu Claude Code is waiting on (a question, a permission, a plan approval), answerable from
@@ -154,6 +173,9 @@ pub struct State {
     pub limits: Limits,
     pub usage: Option<Usage>,
     usage_in: Usage,
+    /// `G` block being received, and the session it is for
+    agents_in: Vec<Subagent>,
+    agents_for: String,
     last_msg: u32,
     pub ever_linked: bool,
     line: Vec<u8>,
@@ -201,6 +223,7 @@ impl State {
                 place: get(5).into(),
                 age: get(6).into(),
                 ctx: get(7).parse().unwrap_or(-1),
+                agents: get(8).parse().unwrap_or(0),
             }),
             "E" => {
                 if self.incoming != self.sessions {
@@ -248,7 +271,39 @@ impl State {
                 ch.limits = true;
             }
             "C" if f.len() >= 2 => self.usage_line(&f, ch),
+            "G" if f.len() >= 3 => self.agents_line(&f, ch),
             _ => {} // 'P' keepalive, or boot noise
+        }
+    }
+
+    /// `G B <id>`, `G S <id> <type> <description> <age> <now>`…, `G E <id>`: the subagents of the
+    /// session whose summary is open. Only a complete block replaces the list.
+    fn agents_line(&mut self, f: &[&str], ch: &mut Changed) {
+        let get = |i: usize| f.get(i).copied().unwrap_or("");
+        match f[1] {
+            "B" => {
+                self.agents_in.clear();
+                self.agents_for = get(2).to_string();
+            }
+            "S" if f.len() >= 6 && get(2) == self.agents_for && self.agents_in.len() < MAX_AGENTS => {
+                self.agents_in.push(Subagent {
+                    kind: get(3).into(),
+                    description: get(4).into(),
+                    age: get(5).into(),
+                    now: get(6).into(),
+                });
+            }
+            "E" if get(2) == self.agents_for => {
+                let agents = std::mem::take(&mut self.agents_in);
+                self.agents_for.clear();
+                if let Some(s) = self.summary.as_mut().filter(|s| s.id == get(2)) {
+                    if s.agents != agents {
+                        s.agents = agents;
+                        ch.summary = true;
+                    }
+                }
+            }
+            _ => {}
         }
     }
 

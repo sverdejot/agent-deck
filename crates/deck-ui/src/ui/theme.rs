@@ -16,6 +16,8 @@ pub const ORANGE_HI: Rgb = rgb(232, 146, 116);
 pub const ON_ORANGE: Rgb = rgb(255, 250, 245);
 pub const ON_ORANGE_MUTED: Rgb = rgb(255, 226, 212);
 pub const ON_ORANGE_FAINT: Rgb = rgb(255, 222, 205);
+/// Darker orange on a working tile: context-bar track, subagent badge
+pub const ORANGE_DEEP: Rgb = rgb(190, 100, 72);
 pub const AMBER: Rgb = rgb(240, 180, 60);
 pub const RED: Rgb = rgb(225, 85, 70);
 pub const WHITE: Rgb = rgb(255, 255, 255);

@@ -2,13 +2,15 @@
 //! the state: working = solid orange, needs you = pulsing orange border, ready = orange border,
 //! idle = faint border. Repo in small caps at the top, title anchored to the bottom, age under it,
 //! context-window bar along the bottom edge.
+//! Running subagents show as a small badge at the top right: a parent dot forking into two, and
+//! the count.
 
 use super::grid::{self, Rect, PER_PAGE};
 use super::theme::{
-    AMBER, BG, FAINT, GREY, GREY_HI, MUTED, ON_ORANGE, ON_ORANGE_FAINT, ORANGE, ORANGE_HI, TEXT, WHITE,
+    AMBER, BG, FAINT, GREY, GREY_HI, MUTED, ON_ORANGE, ON_ORANGE_FAINT, ORANGE, ORANGE_DEEP, ORANGE_HI, TEXT, WHITE,
 };
 use super::Ui;
-use crate::gfx::{fonts, rgb, Canvas, H, W};
+use crate::gfx::{fonts, rgb, Canvas, Rgb, H, W};
 use crate::protocol::{Session, State};
 use crate::text::{fit_tracked, wrap};
 
@@ -112,6 +114,10 @@ impl Ui {
         let x = (r.x + t.pad) as i32;
         if t.show_header {
             c.text(&fonts::TAG, &t.place, x, (r.y + t.pad) as i32, faint, 2, 1.0);
+            if s.agents > 0 {
+                let (bg, fg) = if busy { (ORANGE_DEEP, ON_ORANGE) } else { (GREY.mix(ORANGE, 0.22), ORANGE_HI) };
+                draw_badge(c, s.agents, r.x + r.w - t.pad, r.y + t.pad + 7.0, bg, fg);
+            }
         }
         let lh = fonts::TITLE.line_height();
         let mut bottom = (r.y + r.h - t.pad) as i32;
@@ -128,7 +134,7 @@ impl Ui {
         if s.ctx >= 0 {
             let inset = if busy { 0.0 } else { 2.0 };
             let (bw, by) = (r.w - 2.0 * inset, r.y + r.h - inset - 4.0);
-            let track = if busy { rgb(190, 100, 72) } else { rgb(58, 57, 54) };
+            let track = if busy { ORANGE_DEEP } else { rgb(58, 57, 54) };
             let fill = if busy {
                 ON_ORANGE
             } else if s.ctx >= 80 {
@@ -140,6 +146,38 @@ impl Ui {
             c.round_rect(r.x + inset, by, bw * s.ctx.min(100) as f32 / 100.0, 4.0, 0.0, fill, 1.0);
         }
     }
+}
+
+const BADGE_H: f32 = 18.0;
+/// Room for the badge's fork icon.
+const BADGE_ICON: f32 = 11.0;
+
+fn badge_label(n: u32) -> String {
+    if n > 9 {
+        "9+".into()
+    } else {
+        n.to_string()
+    }
+}
+
+/// Width of the subagent badge for `n` subagents.
+fn badge_width(n: u32) -> f32 {
+    7.0 + BADGE_ICON + 4.0 + fonts::TAG.width(&badge_label(n), 0) as f32 + 7.0
+}
+
+/// Subagent badge: a pill whose right edge is at `right`, centred on `cy`, with a small fork
+/// (one dot branching into two) and the count.
+fn draw_badge(c: &mut Canvas, n: u32, right: f32, cy: f32, bg: Rgb, fg: Rgb) {
+    let w = badge_width(n);
+    let x = right - w;
+    c.round_rect(x, cy - BADGE_H / 2.0, w, BADGE_H, BADGE_H / 2.0, bg, 1.0);
+    let ix = x + 7.0;
+    c.disc(ix + 2.5, cy, 2.5, fg, 1.0);
+    c.disc(ix + 8.5, cy - 3.5, 2.0, fg, 1.0);
+    c.disc(ix + 8.5, cy + 3.5, 2.0, fg, 1.0);
+    let label = badge_label(n);
+    let lx = ix + BADGE_ICON + 4.0 + fonts::TAG.width(&label, 0) as f32 / 2.0;
+    c.text_centered(&fonts::TAG, &label, lx, cy, fg, 1.0);
 }
 
 fn tile_text(s: &Session, r: Rect) -> TileText {
@@ -156,9 +194,10 @@ fn tile_text(s: &Session, r: Rect) -> TileText {
     let top = pad + if show_header { 28.0 } else { 0.0 };
     let bottom = pad + if show_age { (fonts::SUB.line_height() + 2) as f32 } else { 0.0 };
     let max_lines = (((r.h - top - bottom) / fonts::TITLE.line_height() as f32) as usize).clamp(1, 4);
+    let badge = if s.agents > 0 { badge_width(s.agents) as i32 + 6 } else { 0 };
     TileText {
         title: wrap(&fonts::TITLE, &s.title, inner, max_lines),
-        place: fit_tracked(&fonts::TAG, &s.place.to_uppercase(), inner, 2),
+        place: fit_tracked(&fonts::TAG, &s.place.to_uppercase(), inner - badge, 2),
         pad,
         show_header,
         show_age,

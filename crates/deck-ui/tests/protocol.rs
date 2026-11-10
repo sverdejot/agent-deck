@@ -1,7 +1,9 @@
 mod common;
 
 use common::{snapshot, state_with, NOW};
-use deck_ui::protocol::{answer_msg, open_msg, summary_msg, State, Summary, LINK_TIMEOUT_MS, MAX_OPTIONS};
+use deck_ui::protocol::{
+    answer_msg, open_msg, summary_msg, State, Subagent, Summary, LINK_TIMEOUT_MS, MAX_AGENTS, MAX_OPTIONS,
+};
 
 #[test]
 fn snapshot_replaces_sessions() {
@@ -41,6 +43,63 @@ fn older_snapshot_without_ctx_or_age_still_parses() {
     st.feed(b"B\nS\tid\tcode\tidle\tViejo\tesp\nE\n", NOW);
     assert_eq!(st.sessions[0].ctx, -1);
     assert_eq!(st.sessions[0].age, "");
+}
+
+#[test]
+fn snapshot_carries_running_subagents() {
+    let snap = |agents: u32| {
+        format!("B\nS\tcli:0\tcode\tbusy\tUno\tesp\t\t30\t{agents}\nS\tcli:1\tcode\tidle\tDos\tesp\thace 1 h\t-1\nE\n")
+    };
+    let mut st = State::default();
+    st.feed(snap(3).as_bytes(), NOW);
+    assert_eq!(st.sessions[0].agents, 3);
+    assert_eq!(st.sessions[1].agents, 0, "missing field means none");
+    // a change in the count alone is a change of the snapshot
+    assert!(st.feed(snap(1).as_bytes(), NOW).sessions);
+    assert_eq!(st.sessions[0].agents, 1);
+}
+
+const EXPLORE: &str = "G\tS\tcli:0\tExplore\tBuscar usos de tile_rect\t2 min\tGrep: tile_rect\n";
+const TESTS: &str = "G\tS\tcli:0\tgeneral-purpose\tTests\t40 s\n";
+
+#[test]
+fn subagent_block_fills_the_open_summary() {
+    let mut st = state_with(&[("busy", "A", "esp", "", 0)]);
+    st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
+    // a block for another session is ignored
+    let ch = st.feed(b"G\tB\tcli:9\nG\tS\tcli:9\tExplore\tOtra\t1 min\t\nG\tE\tcli:9\n", NOW);
+    assert!(!ch.summary && st.summary.as_ref().unwrap().agents.is_empty());
+    // nothing changes until G E
+    st.feed(format!("G\tB\tcli:0\n{EXPLORE}").as_bytes(), NOW);
+    assert!(st.summary.as_ref().unwrap().agents.is_empty());
+    let ch = st.feed(format!("{TESTS}G\tE\tcli:0\n").as_bytes(), NOW);
+    let agents = &st.summary.as_ref().unwrap().agents;
+    assert!(ch.summary);
+    assert_eq!(
+        agents[0],
+        Subagent {
+            kind: "Explore".into(),
+            description: "Buscar usos de tile_rect".into(),
+            age: "2 min".into(),
+            now: "Grep: tile_rect".into(),
+        }
+    );
+    assert_eq!((agents[1].kind.as_str(), agents[1].now.as_str()), ("general-purpose", ""), "now is optional");
+    // the same block again changes nothing; an empty one clears the list
+    let ch = st.feed(format!("G\tB\tcli:0\n{EXPLORE}{TESTS}G\tE\tcli:0\n").as_bytes(), NOW);
+    assert!(!ch.summary);
+    let ch = st.feed(b"G\tB\tcli:0\nG\tE\tcli:0\n", NOW);
+    assert!(ch.summary && st.summary.as_ref().unwrap().agents.is_empty());
+}
+
+#[test]
+fn subagent_list_is_capped() {
+    let mut st = state_with(&[("busy", "A", "esp", "", 0)]);
+    st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
+    let rows = "G\tS\tcli:0\tExplore\tTarea\t1 min\t\n".repeat(20);
+    let block = format!("G\tB\tcli:0\n{rows}G\tE\tcli:0\n");
+    st.feed(block.as_bytes(), NOW);
+    assert_eq!(st.summary.as_ref().unwrap().agents.len(), MAX_AGENTS);
 }
 
 #[test]

@@ -1,16 +1,19 @@
-//! Summary of a session (hold a tile): state, title, what it is doing, your last message and
-//! Claude's last reply, and a button to open it. When Claude is waiting on a menu (a question, a
-//! permission, a plan approval) the summary shows the question and one button per option instead.
+//! Summary of a session (hold a tile): state, title, what it is doing, the subagents it has
+//! running, your last message and Claude's last reply, and a button to open it. When Claude is
+//! waiting on a menu (a question, a permission, a plan approval) the summary shows the question and
+//! one button per option instead.
 
 use super::draw_centered;
 use super::grid::Rect;
 use super::theme::{GREY, MUTED, ON_ORANGE, ORANGE, ORANGE_HI, TEXT};
 use crate::gfx::{fonts, Canvas, Rgb, H, W};
-use crate::protocol::{Question, Session, State, Summary};
+use crate::protocol::{Question, Session, State, Subagent, Summary};
 use crate::text::{fit, wrap};
 
 /// Taps below this line hit the "Abrir sesión" button.
 pub const OPEN_BUTTON_Y: i32 = H - 80;
+/// Rows of the SUBAGENTES block, "+n más" included.
+const AGENT_ROWS: usize = 4;
 
 /// With a question, "Abrir sesión" becomes a smaller, secondary button at the very bottom.
 const Q_OPEN_TOP: i32 = H - 60;
@@ -71,22 +74,23 @@ pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<us
             y += lh + 10;
         }
         let bottom_limit = H - 84;
-        let mut block = |c: &mut Canvas, label: &str, col: Rgb, text: &str, max_lines: usize| {
-            if text.is_empty() || y + lh * 2 > bottom_limit {
+        let block = |c: &mut Canvas, y: &mut i32, label: &str, col: Rgb, text: &str, max_lines: usize| {
+            if text.is_empty() || *y + lh * 2 > bottom_limit {
                 return;
             }
-            c.text(&fonts::TAG, label, x, y, col, 1, 1.0);
-            y += 20;
-            let room = usize::try_from((bottom_limit - y) / lh).unwrap_or(0);
+            c.text(&fonts::TAG, label, x, *y, col, 1, 1.0);
+            *y += 20;
+            let room = usize::try_from((bottom_limit - *y) / lh).unwrap_or(0);
             let lines = wrap(&fonts::SUB, text, w, max_lines.min(room));
             for (l, line) in lines.iter().enumerate() {
-                c.text(&fonts::SUB, line, x, y + l as i32 * lh, TEXT, 0, 1.0);
+                c.text(&fonts::SUB, line, x, *y + l as i32 * lh, TEXT, 0, 1.0);
             }
-            y += lines.len() as i32 * lh + 12;
+            *y += lines.len() as i32 * lh + 12;
         };
-        block(c, "AHORA", ORANGE, &sum.tool, 2);
-        block(c, "TÚ", MUTED, &sum.you, 3);
-        block(c, "CLAUDE", ORANGE, &sum.claude, 6);
+        block(c, &mut y, "AHORA", ORANGE, &sum.tool, 2);
+        agents_block(c, &mut y, x, w, bottom_limit, &sum.agents);
+        block(c, &mut y, "TÚ", MUTED, &sum.you, 3);
+        block(c, &mut y, "CLAUDE", ORANGE, &sum.claude, 6);
     } else {
         c.text(&fonts::SUB, "Cargando…", x, y + 10, MUTED, 0, 1.0);
     }
@@ -156,4 +160,43 @@ fn option_button(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
     for (l, line) in lines.iter().enumerate() {
         c.text(font, line, tx, ty + l as i32 * lh, fg, 0, 1.0);
     }
+}
+
+/// SUBAGENTES: one row per running subagent ("Explore · Buscar el parser", how long it
+/// has been running on the right); with one or two, what each is doing now under it. Never more
+/// than [`AGENT_ROWS`] rows: the rest are counted in a "+n más" row.
+fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents: &[Subagent]) {
+    let lh = fonts::SUB.line_height();
+    if agents.is_empty() || *y + 20 + lh > bottom {
+        return;
+    }
+    c.text(&fonts::TAG, &format!("SUBAGENTES · {}", agents.len()), x, *y, ORANGE, 1, 1.0);
+    *y += 20;
+    let room = usize::try_from((bottom - *y) / lh).unwrap_or(0).clamp(1, AGENT_ROWS);
+    let shown = if agents.len() > room { (room - 1).max(1) } else { agents.len() };
+    let detail = shown == agents.len() && room >= 2 * shown;
+    let indent = 14;
+    for a in &agents[..shown] {
+        c.disc((x + 4) as f32, *y as f32 + fonts::SUB.ascent as f32 * 0.68, 3.0, ORANGE, 1.0);
+        let age_w = if a.age.is_empty() { 0 } else { fonts::SUB.width(&a.age, 0) + 10 };
+        let label = match (a.kind.is_empty(), a.description.is_empty()) {
+            (false, false) => format!("{} · {}", a.kind, a.description),
+            (true, _) => a.description.clone(),
+            (false, true) => a.kind.clone(),
+        };
+        c.text(&fonts::SUB, &fit(&fonts::SUB, &label, w - indent - age_w), x + indent, *y, TEXT, 0, 1.0);
+        if age_w > 0 {
+            c.text(&fonts::SUB, &a.age, x + w - age_w + 10, *y, MUTED, 0, 1.0);
+        }
+        *y += lh;
+        if detail && !a.now.is_empty() {
+            c.text(&fonts::SUB, &fit(&fonts::SUB, &a.now, w - indent), x + indent, *y, MUTED, 0, 1.0);
+            *y += lh;
+        }
+    }
+    if shown < agents.len() && shown < room {
+        c.text(&fonts::SUB, &format!("+{} más", agents.len() - shown), x + indent, *y, MUTED, 0, 1.0);
+        *y += lh;
+    }
+    *y += 12;
 }

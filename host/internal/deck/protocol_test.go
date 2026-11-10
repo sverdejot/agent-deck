@@ -24,7 +24,7 @@ func TestClean(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	ss := []claude.Session{
 		{ID: "cli:1", State: "busy", Title: "Uno\tcon tab", Place: "esp"},
-		{ID: "cli:2", State: "idle", Title: "Dos", Place: "homelab", Age: "hace 3 h"},
+		{ID: "cli:2", State: "idle", Title: "Dos", Place: "homelab", Age: "hace 3 h", Agents: 2},
 	}
 	got := Snapshot(ss, func(s claude.Session) int {
 		if s.ID == "cli:1" {
@@ -33,8 +33,8 @@ func TestSnapshot(t *testing.T) {
 		return -1
 	})
 	want := "B\n" +
-		"S\tcli:1\tcode\tbusy\tUno con tab\tesp\t\t30\n" +
-		"S\tcli:2\tcode\tidle\tDos\thomelab\thace 3 h\t-1\n" +
+		"S\tcli:1\tcode\tbusy\tUno con tab\tesp\t\t30\t0\n" +
+		"S\tcli:2\tcode\tidle\tDos\thomelab\thace 3 h\t-1\t2\n" +
 		"E\n"
 	if got != want {
 		t.Errorf("Snapshot =\n%q\nwant\n%q", got, want)
@@ -118,5 +118,26 @@ func TestParseAnswer(t *testing.T) {
 	label := OptionLabel(strings.Repeat("ñ", 50) + " ")
 	if a, ok := ParseAnswer("A\tcli:1\t2\t" + label); !ok || a.Label != label {
 		t.Errorf("round trip: %q", a.Label)
+	}
+}
+
+func TestAgentLines(t *testing.T) {
+	agents := []claude.Subagent{
+		{Type: "Explore", Description: "Buscar usos\tde tile_rect", Age: "3 min", Now: "Grep: tile_rect"},
+		{Type: "general-purpose", Description: "Tests", Age: "40 s"},
+	}
+	want := "G\tB\tcli:1\n" +
+		"G\tS\tcli:1\tExplore\tBuscar usos de tile_rect\t3 min\tGrep: tile_rect\n" +
+		"G\tS\tcli:1\tgeneral-purpose\tTests\t40 s\t\n" +
+		"G\tE\tcli:1\n"
+	if got := AgentLines("cli:1", agents); got != want {
+		t.Errorf("AgentLines =\n%q\nwant\n%q", got, want)
+	}
+	if got := AgentLines("cli:1", nil); got != "G\tB\tcli:1\nG\tE\tcli:1\n" {
+		t.Errorf("no subagents: %q", got)
+	}
+	many := make([]claude.Subagent, 20)
+	if n := strings.Count(AgentLines("cli:1", many), "G\tS\t"); n != maxAgents {
+		t.Errorf("%d subagents listed, want %d", n, maxAgents)
 	}
 }

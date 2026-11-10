@@ -24,6 +24,7 @@ type Session struct {
 	Age     string    // "hace 3 h"; empty while working
 	When    time.Time // last activity
 	Started time.Time // sessions are listed oldest first, so tiles keep their place
+	Agents  int       // subagents running now
 
 	SessionID string // Claude Code session id (transcript, statusline snapshot)
 
@@ -100,6 +101,7 @@ func readSession(path string) (Session, bool) {
 	if s.State != "busy" {
 		s.Age = Ago(when)
 	}
+	s.Agents = len(Subagents(c.SessionID, s.State, false))
 	if i := strings.LastIndex(c.Tmux, "."); i >= 0 {
 		s.TmuxPane = c.Tmux[i+1:]
 	}

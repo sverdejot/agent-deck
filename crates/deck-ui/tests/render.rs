@@ -1,18 +1,20 @@
 mod common;
 
-use common::{pixel, render, render_banded, state_with, NOW};
-use deck_ui::protocol::{State, LINK_TIMEOUT_MS};
-use deck_ui::ui::theme::{BG, GREY, ORANGE};
+use common::{pixel, render, render_banded, snapshot, state_with, NOW};
+use deck_ui::protocol::{State, Summary, LINK_TIMEOUT_MS};
+use deck_ui::ui::theme::{BG, GREY, ORANGE, ORANGE_DEEP};
 use deck_ui::ui::{Screen, Ui};
 
+const SAMPLE: [(&str, &str, &str, &str, i32); 5] = [
+    ("busy", "Detección de Seeedstudio SenseCap Indicator", "esp", "", 30),
+    ("ready", "Migración de Authentik a Pocket ID", "homelab", "ahora", 85),
+    ("wait", "Glance como PWA sin icono", "homelab", "hace 10 min", 12),
+    ("idle", "Revisión de sesiones pendientes", "repos", "hace 19 h", -1),
+    ("idle", "Fallo de DNS en home.lab", "homelab", "hace 11 h", 40),
+];
+
 fn sample() -> State {
-    let mut st = state_with(&[
-        ("busy", "Detección de Seeedstudio SenseCap Indicator", "esp", "", 30),
-        ("ready", "Migración de Authentik a Pocket ID", "homelab", "ahora", 85),
-        ("wait", "Glance como PWA sin icono", "homelab", "hace 10 min", 12),
-        ("idle", "Revisión de sesiones pendientes", "repos", "hace 19 h", -1),
-        ("idle", "Fallo de DNS en home.lab", "homelab", "hace 11 h", 40),
-    ]);
+    let mut st = state_with(&SAMPLE);
     st.feed(b"L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo: 100% a las 16:10\tahora\n", NOW);
     st.feed(b"C\tB\nC\tH\t32\t4\t1,8 M\ttokens hoy\nC\tS\tesp\t464 k\t1,2,3,4\nC\tD\tL,M\t10,20\t1\nC\tE\n", NOW);
     st
@@ -59,6 +61,42 @@ fn tile_colours_follow_state() {
     // 5 sessions → 3x2: busy top-left is solid orange, idle tiles are grey inside
     assert_eq!(pixel(&frame, 60, 60), ORANGE.pack());
     assert_eq!(pixel(&frame, 60, 300), GREY.pack());
+}
+
+#[test]
+fn subagent_badge_on_the_tile() {
+    // 5 sessions → 3x2; the first tile (busy) is 147 px wide with 14 px of padding, so the badge
+    // ends at x = 143 and is centred on y = 31; its right end is plain badge colour
+    let mut st = sample();
+    let without = render(&ui_for(&st), &st, NOW);
+    assert_eq!(pixel(&without, 139, 31), ORANGE.pack());
+    // the same snapshot, with 2 subagents on the first session
+    st.feed(snapshot(&SAMPLE).replacen("\t30\n", "\t30\t2\n", 1).as_bytes(), NOW);
+    assert_eq!(st.sessions[0].agents, 2);
+    let with = render(&ui_for(&st), &st, NOW);
+    assert_eq!(pixel(&with, 139, 31), ORANGE_DEEP.pack());
+}
+
+#[test]
+fn summary_with_subagents_renders_in_bands() {
+    let mut st = sample();
+    st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
+    st.feed(b"Y\tcli:0\tEmpezo hace 1 h\thola\tadios\tAgent: Buscar usos\n", NOW);
+    st.feed(
+        concat!(
+            "G\tB\tcli:0\n",
+            "G\tS\tcli:0\tExplore\tBuscar usos de tile_rect en todo el repositorio\t2 min\tGrep: tile_rect\n",
+            "G\tS\tcli:0\tgeneral-purpose\tTests\t40 s\t\n",
+            "G\tS\tcli:0\tPlan\tDiseno\t10 s\t\n",
+            "G\tE\tcli:0\n",
+        )
+        .as_bytes(),
+        NOW,
+    );
+    assert_eq!(st.summary.as_ref().unwrap().agents.len(), 3);
+    let ui = ui_for(&st);
+    let full = render(&ui, &st, NOW);
+    assert!(full == render_banded(&ui, &st, NOW, 37), "summary with subagents, bands of 37");
 }
 
 #[test]

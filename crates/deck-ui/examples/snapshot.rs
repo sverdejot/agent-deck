@@ -14,7 +14,7 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 
 use deck_ui::gfx::{Canvas, H, W};
-use deck_ui::protocol::{State, Summary};
+use deck_ui::protocol::{State, Subagent, Summary};
 use deck_ui::ui::Ui;
 
 const NOW: u32 = 10_000;
@@ -39,10 +39,15 @@ const SESSIONS: [Sample; 12] = [
     ("idle", "Actualizar dotfiles a zsh 5.9", "dotfiles", "hace 6 h", 15),
 ];
 
-fn state(sessions: &[Sample]) -> State {
+/// Subagents running per session, for the `*-agents` snapshots: busy tiles with several, a
+/// waiting one with one, an idle one with a background subagent, and one with more than 9.
+const AGENTS: [u32; 12] = [3, 0, 1, 1, 0, 2, 0, 0, 12, 0, 0, 0];
+
+fn state(sessions: &[Sample], agents: &[u32]) -> State {
     let mut snap = String::from("B\n");
     for (i, (st, title, place, age, ctx)) in sessions.iter().enumerate() {
-        writeln!(snap, "S\tcli:{i}\tcode\t{st}\t{title}\t{place}\t{age}\t{ctx}").unwrap();
+        let n = agents.get(i).copied().unwrap_or(0);
+        writeln!(snap, "S\tcli:{i}\tcode\t{st}\t{title}\t{place}\t{age}\t{ctx}\t{n}").unwrap();
     }
     snap += "E\n";
     snap += "L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo: 100% a las 16:10\tahora\n";
@@ -133,7 +138,7 @@ fn main() {
 
     let mut six = None;
     for n in [1, 2, 4, 6, 12] {
-        let st = state(&SESSIONS[..n]);
+        let st = state(&SESSIONS[..n], &[]);
         let mut ui = Ui::new();
         ui.layout(&st);
         let img = render(&ui, &st);
@@ -142,9 +147,16 @@ fn main() {
             six = Some(img);
         }
     }
+    // the same grids with subagents running (9 = the smallest tiles)
+    for n in [1, 4, 6, 9, 12] {
+        let st = state(&SESSIONS[..n], &AGENTS);
+        let mut ui = Ui::new();
+        ui.layout(&st);
+        save(&render(&ui, &st), &format!("sessions-{n}-agents"));
+    }
 
     // holding a tile: the summary of the session at work
-    let mut st = state(&SESSIONS[..4]);
+    let mut st = state(&SESSIONS[..4], &[]);
     st.summary = Some(Summary {
         id: "cli:0".into(),
         loaded: true,
@@ -154,13 +166,14 @@ fn main() {
                  bus SPI. Muevo la inicialización del expansor al principio y pruebo de nuevo."
             .into(),
         tool: "Editando firmware/src/display.rs".into(),
+        agents: Vec::new(),
     });
     let mut ui = Ui::new();
     ui.layout(&st);
     save(&render(&ui, &st), "summary");
 
     // holding a session that waits on Claude's question: the options, ready to tap
-    let mut st = state(&SESSIONS[..4]);
+    let mut st = state(&SESSIONS[..4], &[]);
     st.summary = Some(Summary { id: "cli:2".into(), loaded: true, ..Default::default() });
     let question = "Q\tcli:2\t¿Dónde guardo los iconos de la PWA?\t1.En /static, servidos por Glance\t\
                     2.En un bucket de S3 con su propia caché\t3.Generarlos en el build\n";
@@ -169,7 +182,34 @@ fn main() {
     ui.layout(&st);
     save(&render(&ui, &st), "summary-question");
 
-    let mut st = state(&SESSIONS[..3]);
+    // the same session with three subagents at work
+    let mut st = state(&SESSIONS[..4], &AGENTS);
+    let agent = |kind: &str, description: &str, age: &str, now: &str| Subagent {
+        kind: kind.into(),
+        description: description.into(),
+        age: age.into(),
+        now: now.into(),
+    };
+    st.summary = Some(Summary {
+        id: "cli:0".into(),
+        loaded: true,
+        meta: "Empezó hace 2 h · 14 mensajes · esp · activa ahora".into(),
+        you: "Revisa por qué el panel parpadea al cambiar de pantalla y propón un arreglo.".into(),
+        claude: "Lanzo tres subagentes: uno busca dónde se redibuja, otro mide el tiempo de cada banda y otro \
+                 revisa la inicialización del bus."
+            .into(),
+        tool: "Agent: Buscar usos de tile_rect".into(),
+        agents: vec![
+            agent("Explore", "Buscar usos de tile_rect", "3 min", "Grep: tile_rect"),
+            agent("general-purpose", "Medir el tiempo de dibujo por banda", "2 min", "Bash: cargo test --release"),
+            agent("Plan", "Revisar la inicialización del bus SPI", "40 s", ""),
+        ],
+    });
+    let mut ui = Ui::new();
+    ui.layout(&st);
+    save(&render(&ui, &st), "summary-agents");
+
+    let mut st = state(&SESSIONS[..3], &[]);
     let mut ui = Ui::new();
     ui.layout(&st);
     ui.next_screen(&mut st, 0);

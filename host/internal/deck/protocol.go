@@ -22,16 +22,22 @@ const (
 	maxQuestion = 300
 	maxOption   = 80 // label of each option
 	maxOptions  = 6
+	maxAgents    = 8 // subagents listed (the deck keeps no more)
+	maxAgentType = 40
+	maxAgentDesc = 120
+	maxAgentAge  = 12
+	maxAgentNow  = 100
 )
 
-// Snapshot is the full list of sessions: B, one S per session, E.
+// Snapshot is the full list of sessions: B, one S per session (with its running subagents), E.
 // ctx returns the context-window use (0-100, -1 unknown) of a session.
 func Snapshot(sessions []claude.Session, ctx func(claude.Session) int) string {
 	var b strings.Builder
 	b.WriteString("B\n")
 	for _, s := range sessions {
-		fmt.Fprintf(&b, "S\t%s\tcode\t%s\t%s\t%s\t%s\t%d\n",
-			Clean(s.ID, maxID), s.State, Clean(s.Title, maxTitle), Clean(s.Place, maxPlace), Clean(s.Age, maxAge), ctx(s))
+		fmt.Fprintf(&b, "S\t%s\tcode\t%s\t%s\t%s\t%s\t%d\t%d\n",
+			Clean(s.ID, maxID), s.State, Clean(s.Title, maxTitle), Clean(s.Place, maxPlace), Clean(s.Age, maxAge), ctx(s),
+			s.Agents)
 	}
 	b.WriteString("E\n")
 	return b.String()
@@ -82,6 +88,20 @@ func ParseAnswer(line string) (Answer, bool) {
 		return Answer{}, false
 	}
 	return Answer{ID: f[1], N: n, Label: strings.TrimSpace(f[3])}, true
+}
+
+// AgentLines lists the subagents running for a session, for its summary: G B, one G S per
+// subagent (oldest first, at most maxAgents), G E. An empty list (G B, G E) clears the deck's.
+func AgentLines(id string, agents []claude.Subagent) string {
+	id = Clean(id, maxID)
+	var b strings.Builder
+	fmt.Fprintf(&b, "G\tB\t%s\n", id)
+	for _, a := range agents[:min(len(agents), maxAgents)] {
+		fmt.Fprintf(&b, "G\tS\t%s\t%s\t%s\t%s\t%s\n", id, Clean(a.Type, maxAgentType),
+			Clean(a.Description, maxAgentDesc), Clean(a.Age, maxAgentAge), Clean(a.Now, maxAgentNow))
+	}
+	fmt.Fprintf(&b, "G\tE\t%s\n", id)
+	return b.String()
 }
 
 // LimitsLine feeds the Limits screen.
