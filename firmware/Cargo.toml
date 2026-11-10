@@ -1,0 +1,54 @@
+[package]
+name = "agent-deck"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+rust-version = "1.88"
+description = "Agent Deck firmware for the SenseCAP Indicator D1 (ESP32-S3)"
+publish = false
+
+[[bin]]
+name = "agent-deck"
+harness = false # no built-in test harness on the target (keeps rust-analyzer quiet)
+
+[profile.release]
+opt-level = 3     # drawing loops are the hot path; flash has room
+debug = true      # symbols don't go to flash, they make backtraces readable
+codegen-units = 1
+lto = "fat"
+
+[profile.dev]
+debug = true
+opt-level = "s"
+
+# Exact versions are recorded in Cargo.lock (committed). The esp-idf-* stack moves in lockstep,
+# so it is pinned exactly here too and bumped as a set.
+[dependencies]
+deck-ui = { path = "../crates/deck-ui" }
+esp-idf-svc = "=0.53.0"
+log = "0.4.35"
+anyhow = "1.0.100"
+
+[build-dependencies]
+embuild = "=0.33.7"
+
+[package.metadata.esp-idf-sys]
+# extra C headers to generate bindings for (async memcpy, cache sync)
+extra_components = [{ bindings_header = "src/bindings.h", bindings_module = "ext" }]
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_lossless = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+# register checks read better as masks (`r[0] & 0x0F == 0`)
+verbose_bit_mask = "allow"

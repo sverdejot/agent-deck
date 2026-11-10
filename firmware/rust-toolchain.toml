@@ -1,0 +1,4 @@
+# The Xtensa (ESP32-S3) Rust toolchain installed by espup as "esp".
+# Its exact version is pinned in ../mise.toml (vars.esp_toolchain); `mise run setup` installs it.
+[toolchain]
+channel = "esp"

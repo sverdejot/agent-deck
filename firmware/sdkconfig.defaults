@@ -1,0 +1,32 @@
+# SenseCAP Indicator D1 — ESP32-S3, 8 MB flash, 8 MB octal PSRAM
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+# single factory app, 1.5 MB (built-in table: a custom CSV path would resolve inside the build dir)
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# PSRAM: octal, 80 MHz (same as the Arduino build; 120 MHz is an experiment for later)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+# keep code/rodata reachable while flash is busy, so the RGB refresh never starves
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# Rust needs larger stacks than C
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+CONFIG_FREERTOS_IDLE_TASK_STACKSIZE=4096
+CONFIG_PTHREAD_TASK_STACK_SIZE_DEFAULT=8192
+CONFIG_FREERTOS_HZ=1000
+
+# UART0 (CH340) carries the protocol: keep logs to warnings so it stays clean
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# the RGB panel ISR stays responsive during flash/cache operations
+CONFIG_LCD_RGB_ISR_IRAM_SAFE=y

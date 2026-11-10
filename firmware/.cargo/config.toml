@@ -1,0 +1,18 @@
+[build]
+target = "xtensa-esp32s3-espidf"
+
+[target.xtensa-esp32s3-espidf]
+linker = "ldproxy"
+# UploadSpeed 115200: the Indicator's CH340 drops data at higher baud rates
+runner = "espflash flash --baud 115200"
+rustflags = ["--cfg", "espidf_time64"]
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+[env]
+MCU = "esp32s3"
+ESP_IDF_VERSION = "v5.5.5"
+# ESP-IDF and its tools live in .embuild/ next to this crate (isolated, survives `cargo clean`)
+ESP_IDF_TOOLS_INSTALL_DIR = "workspace"
+ESP_IDF_SDKCONFIG_DEFAULTS = "sdkconfig.defaults"
