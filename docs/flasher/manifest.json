@@ -1,0 +1,13 @@
+{
+  "name": "Agent Deck",
+  "version": "__VERSION__",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "agent-deck-firmware___VERSION___esp32s3.bin", "offset": 0 }
+      ]
+    }
+  ]
+}

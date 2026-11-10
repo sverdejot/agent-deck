@@ -1,0 +1,187 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# release-please keeps a release PR open from the Conventional Commits on main. Merging it tags
+# vX.Y.Z and creates the GitHub Release; the jobs below then attach the Mac binaries, the merged
+# firmware image and checksums.txt, and publish the web flasher (docs/flasher) to GitHub Pages.
+# Actions are pinned to commit SHAs (tag in the comment).
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  host:
+    name: host (darwin ${{ matrix.arch }})
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: macos-latest # go.bug.st/serial enumerates ports through IOKit (cgo)
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        arch: [arm64, amd64]
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: host/go.mod
+          cache-dependency-path: host/go.sum
+      - name: Build
+        working-directory: host
+        env:
+          CGO_ENABLED: "1"
+          GOOS: darwin
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o dist/agent-deck ./cmd/agent-deck
+          file dist/agent-deck
+          tar -czf "agent-deck_${VERSION}_darwin_${GOARCH}.tar.gz" -C dist agent-deck
+      - name: Upload to the release
+        working-directory: host
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "agent-deck_${VERSION}_darwin_${{ matrix.arch }}.tar.gz" --clobber
+
+  firmware:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - name: Tool versions from mise.toml
+        id: v
+        working-directory: .
+        run: |
+          echo "esp=$(sed -n 's/^esp_toolchain = "\(.*\)"/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
+          echo "espflash=$(sed -n 's/^"cargo:espflash" = "\(.*\)"/\1/p' mise.toml)" >> "$GITHUB_OUTPUT"
+      - uses: esp-rs/xtensa-toolchain@ec6d36527049a7f4fb2cb0c1a644668c1bb8a2a4 # v1.7.0
+        with:
+          default: true
+          buildtargets: esp32s3
+          version: ${{ steps.v.outputs.esp }}
+          ldproxy: true
+      - name: Cache ESP-IDF and build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            firmware/.embuild
+            firmware/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: firmware-${{ runner.os }}-${{ steps.v.outputs.esp }}-${{ hashFiles('firmware/Cargo.lock', 'firmware/sdkconfig.defaults', 'firmware/.cargo/config.toml') }}
+          restore-keys: firmware-${{ runner.os }}-${{ steps.v.outputs.esp }}-
+      - run: cargo build --release
+      - name: Install espflash ${{ steps.v.outputs.espflash }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ESPFLASH: ${{ steps.v.outputs.espflash }}
+        run: |
+          gh release download "v${ESPFLASH}" --repo esp-rs/espflash \
+            --pattern espflash-x86_64-unknown-linux-musl.zip --dir "$RUNNER_TEMP"
+          unzip -o "$RUNNER_TEMP/espflash-x86_64-unknown-linux-musl.zip" -d "$RUNNER_TEMP/espflash"
+          chmod +x "$RUNNER_TEMP/espflash/espflash"
+          echo "$RUNNER_TEMP/espflash" >> "$GITHUB_PATH"
+      - name: Merged image (bootloader + partition table + app, flash at 0x0)
+        run: |
+          espflash --version
+          espflash save-image --skip-update-check --chip esp32s3 --merge --skip-padding --flash-size 8mb \
+            target/xtensa-esp32s3-espidf/release/agent-deck "agent-deck-firmware_${VERSION}_esp32s3.bin"
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "agent-deck-firmware_${VERSION}_esp32s3.bin" --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware
+          path: firmware/agent-deck-firmware_${{ env.VERSION }}_esp32s3.bin
+          if-no-files-found: error
+
+  checksums:
+    needs: [release-please, host, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: checksums.txt
+        run: |
+          mkdir "$RUNNER_TEMP/assets" && cd "$RUNNER_TEMP/assets"
+          gh release download "$TAG" --pattern 'agent-deck*'
+          sha256sum agent-deck* | tee checksums.txt
+          gh release upload "$TAG" checksums.txt --clobber
+
+  pages:
+    needs: [release-please, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp docs/flasher/index.html docs/flasher/manifest.json _site/
+          sed -i "s/__VERSION__/${VERSION}/g" _site/index.html _site/manifest.json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: firmware
+          path: _site
+      - name: Check the manifest points at the image
+        run: |
+          jq -e . _site/manifest.json
+          test -f "_site/$(jq -r '.builds[0].parts[0].path' _site/manifest.json)"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
