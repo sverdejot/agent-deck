@@ -35,6 +35,17 @@ updates:
       all:
         patterns: ["*"]
 
+  # semantic-release and its preset (used by the release workflow)
+  - package-ecosystem: npm
+    directory: /.github/release
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    groups:
+      all:
+        patterns: ["*"]
+
   # keeps the SHA-pinned actions (and their version comments) up to date
   - package-ecosystem: github-actions
     directory: /

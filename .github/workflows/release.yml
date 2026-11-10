@@ -10,11 +10,12 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# On every push to main, semantic-release (.releaserc.json) reads the Conventional Commits since the
+# On every push to main, semantic-release (.github/release/package.json) reads the Conventional Commits since the
 # last vX.Y.Z tag and, if any is releasable (feat, fix, perf, breaking), tags the next version and
 # publishes the GitHub Release with the changelog as its notes. The jobs below attach the Mac
 # binaries, the merged firmware image and checksums.txt, and publish the web flasher (docs/flasher)
-# to GitHub Pages. Actions are pinned to commit SHAs (tag in the comment).
+# to GitHub Pages. Actions are pinned to commit SHAs (tag in the comment); semantic-release and its
+# preset are pinned in .github/release/package-lock.json, both kept up to date by dependabot.
 
 jobs:
   release:
@@ -22,21 +23,32 @@ jobs:
     permissions:
       contents: write
     outputs:
-      created: ${{ steps.sr.outputs.new_release_published }}
-      tag: ${{ steps.sr.outputs.new_release_git_tag }}
-      version: ${{ steps.sr.outputs.new_release_version }}
+      created: ${{ steps.sr.outputs.created }}
+      tag: ${{ steps.sr.outputs.tag }}
+      version: ${{ steps.sr.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - id: sr
-        uses: cycjimmy/semantic-release-action@ad51787758d9654d5a75150a89a6fa9b3ccef95e # v8.1.4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          semantic_version: 25.0.9
-          extra_plugins: conventional-changelog-conventionalcommits@10.4.1
+          node-version-file: .github/release/package.json
+          cache: npm
+          cache-dependency-path: .github/release/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: .github/release
+      - name: semantic-release
+        id: sr
+        working-directory: .github/release
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          npx semantic-release
+          tag=$(git tag --points-at HEAD --list 'v*' | head -1)
+          if [ -n "$tag" ]; then
+            { echo "created=true"; echo "tag=$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
+          fi
 
   host:
     name: host (darwin ${{ matrix.arch }})
