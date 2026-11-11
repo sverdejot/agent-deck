@@ -39,7 +39,7 @@ func main() {
 
 	switch flag.Arg(0) {
 	case "":
-		log.SetFlags(log.Ltime)
+		log.SetFlags(log.LstdFlags) // date too: under launchd the log spans days
 		run(*port, *verbose)
 	case "version":
 		fmt.Println(version)

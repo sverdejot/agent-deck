@@ -29,12 +29,13 @@ const (
 
 // run waits for the deck, serves it while connected, and starts over when it goes away.
 func run(portOverride string, verbose bool) {
-	waiting := false
+	log.Printf("agent-deck %s starting (pid %d)", version, os.Getpid())
+	waiting, openErr := false, ""
 	for {
 		name := deck.FindPort(portOverride)
 		if name == "" {
 			if !waiting {
-				log.Print("esperando al deck (USB)…")
+				log.Print("waiting for the deck on USB…")
 				waiting = true
 			}
 			time.Sleep(retryEvery)
@@ -43,14 +44,19 @@ func run(portOverride string, verbose bool) {
 		waiting = false
 		p, err := deck.Open(name)
 		if err != nil {
-			log.Printf("abrir %s: %v", name, err)
+			// retried every 2 s (e.g. while flashing holds the port): log each new error once
+			if e := err.Error(); e != openErr {
+				log.Printf("can't open %s: %v (retrying)", name, err)
+				openErr = e
+			}
 			time.Sleep(retryEvery)
 			continue
 		}
-		log.Printf("conectado a %s", name)
+		openErr = ""
+		log.Printf("connected to %s", name)
 		err = (&conn{port: p, name: name, verbose: verbose}).serve()
 		_ = p.Close()
-		log.Printf("desconectado: %v", err)
+		log.Printf("disconnected: %v", err)
 		time.Sleep(time.Second)
 	}
 }
@@ -72,9 +78,10 @@ type conn struct {
 	agentsSent   string
 	agentsAt     time.Time
 
-	last   string
-	sentAt time.Time
-	slowAt time.Time
+	last     string
+	sentAt   time.Time
+	slowAt   time.Time
+	lastSeen string // session counts last logged
 
 	// the menu (question) of the session whose summary is open on the deck; serve loop only
 	watch      string        // session id, "" none
@@ -102,8 +109,10 @@ func (c *conn) send(force bool) error {
 	if !force && msg == c.last && time.Since(c.sentAt) < keepaliveEvery {
 		return nil
 	}
-	if c.verbose || msg != c.last {
-		log.Printf("%d sesiones", len(ss))
+	// the snapshot changes all the time (ages, context %): log only when the counts per state do
+	if seen := describe(ss); seen != c.lastSeen {
+		log.Print(seen)
+		c.lastSeen = seen
 	}
 	c.last, c.sentAt = msg, time.Now()
 	if force || time.Since(c.slowAt) > slowEvery {
@@ -155,7 +164,7 @@ func (c *conn) serve() error {
 		for sc.Scan() {
 			lines <- strings.TrimSpace(sc.Text())
 		}
-		readErr <- fmt.Errorf("lectura: %w", sc.Err())
+		readErr <- fmt.Errorf("read: %w", sc.Err())
 	}()
 
 	if err := c.send(true); err != nil {
@@ -178,7 +187,7 @@ func (c *conn) serve() error {
 				return err
 			}
 			if _, err := os.Stat(c.name); err != nil {
-				return fmt.Errorf("puerto desaparecido")
+				return fmt.Errorf("port gone")
 			}
 		case l := <-lines:
 			if err := c.handle(l); err != nil {
@@ -217,15 +226,20 @@ func (c *conn) handle(l string) error {
 	case "O":
 		s, ok := c.find(id)
 		if !ok {
-			log.Printf("abrir %s: no encontrada", id)
+			log.Printf("open %s: session not found", id)
 			return nil
 		}
-		log.Printf("abrir %s", s.Title)
+		log.Printf("open %q", s.Title)
 		go func() {
 			if err := macos.Focus(s.TmuxPane, s.TTY); err != nil {
-				log.Printf("abrir %s: %v", s.Title, err)
+				log.Printf("open %q: %v", s.Title, err)
 			}
 		}()
+	default:
+		// boot messages and D (frame timing) stats: only worth seeing when debugging the firmware
+		if c.verbose && l != "" {
+			log.Printf("deck: %s", l)
+		}
 	}
 	return nil
 }
@@ -260,7 +274,7 @@ func (c *conn) pollQuestion() error {
 	}
 	c.qLine = line
 	if c.verbose {
-		log.Printf("pregunta: %q", strings.TrimSpace(line))
+		log.Printf("question: %q", strings.TrimSpace(line))
 	}
 	return c.write(line)
 }
@@ -274,22 +288,40 @@ func (c *conn) answer(line string) {
 	}
 	s, ok := c.find(a.ID)
 	if !ok || s.TmuxPane == "" || a.ID != c.watch {
-		log.Printf("responder %s: no encontrada", a.ID)
+		log.Printf("answer %s: session not found", a.ID)
 		return
 	}
 	c.watchUntil = time.Now().Add(watchFor)
 	c.qLine = "" // the deck dropped its copy: send it what is on screen next, even if it looks the same
 	m, ok := menuOn(s.TmuxPane)
 	if !ok || m.Key() != c.qKey || !offered(c.qSent, a) {
-		log.Printf("responder %s: la pregunta ya no está en pantalla", s.Title)
+		log.Printf("answer %q: the question is no longer on screen", s.Title)
 		return
 	}
 	if err := macos.Answer(s.TmuxPane, a.N); err != nil {
-		log.Printf("responder %s: %v", s.Title, err)
+		log.Printf("answer %q: %v", s.Title, err)
 		return
 	}
-	log.Printf("respuesta %d (%s) a %s", a.N, a.Label, s.Title)
+	log.Printf("answered %q with %d (%s)", s.Title, a.N, a.Label)
 	c.qPause = time.Now().Add(answerPause)
+}
+
+// describe counts sessions per state for the log: "3 sessions: 1 busy, 1 wait, 1 idle".
+func describe(ss []claude.Session) string {
+	n := map[string]int{}
+	for _, s := range ss {
+		n[s.State]++
+	}
+	var parts []string
+	for _, st := range []string{"busy", "wait", "ready", "idle"} {
+		if n[st] > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n[st], st))
+		}
+	}
+	if len(parts) == 0 {
+		return "0 sessions"
+	}
+	return fmt.Sprintf("%d sessions: %s", len(ss), strings.Join(parts, ", "))
 }
 
 // menuOn is the menu Claude Code is waiting on in a tmux pane.
