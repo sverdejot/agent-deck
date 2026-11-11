@@ -2,7 +2,7 @@ mod common;
 
 use common::{pixel, render, render_banded, snapshot, state_with, NOW};
 use deck_ui::protocol::{State, Summary, LINK_TIMEOUT_MS};
-use deck_ui::ui::theme::{BG, GREY, GREY_HI, ON_ORANGE, ORANGE};
+use deck_ui::ui::theme::{BG, GREY, GREY_HI, ON_ORANGE, ORANGE, TEXT};
 use deck_ui::ui::{Screen, Ui};
 
 const SAMPLE: [(&str, &str, &str, &str, i32); 5] = [
@@ -193,6 +193,19 @@ fn open_button_still_works_with_a_question() {
     ui.touch(&mut st, Some((240, 450)), NOW + 2000);
     assert_eq!(ui.touch(&mut st, None, NOW + 2100).0.as_deref(), Some("O\tcli:2\n"));
     assert!(st.summary.is_none());
+}
+
+#[test]
+fn holding_a_tile_fills_a_bar_along_its_top() {
+    let mut st = sample();
+    let mut ui = ui_for(&st);
+    // second tile (ready, grey inside); just inside its 2 px border at the top-left
+    ui.touch(&mut st, Some((300, 60)), NOW);
+    let early = render(&ui, &st, NOW + 100);
+    assert_eq!(pixel(&early, 260, 13), GREY_HI.pack(), "a tap shows only the pressed tile");
+    assert!(ui.animating(&st, NOW + 300), "the bar moves while the finger stays");
+    let late = render(&ui, &st, NOW + 550);
+    assert_eq!(pixel(&late, 260, 13), TEXT.pack(), "the bar has grown past the left edge");
 }
 
 #[test]

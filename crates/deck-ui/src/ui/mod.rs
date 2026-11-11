@@ -20,7 +20,9 @@ use crate::protocol::{answer_msg, open_msg, summary_msg, Session, State, Summary
 use crate::splash::Splash;
 use theme::{BG, MUTED, TEXT};
 
-const HOLD_MS: u32 = 600;
+const HOLD_MS: u32 = 400;
+/// A finger still down after this starts showing the hold filling up.
+const HOLD_HINT_MS: u32 = 120;
 const SLOP_PX: i32 = 14;
 const TOAST_MS: u32 = 1400;
 const FLASH_MS: u32 = 500;
@@ -171,10 +173,26 @@ impl Ui {
         self.pressed_option.map(summary::Pressed::Option)
     }
 
+    /// How far the finger held on tile `i` is towards opening its summary (0 = not shown yet,
+    /// 1 = about to open). Taps lift well before it starts, so they never show it.
+    pub(super) fn hold_progress(&self, i: usize, now: u32) -> f32 {
+        if !self.touching || self.held || self.swiping || self.pressed != Some(i) {
+            return 0.0;
+        }
+        let t = now.wrapping_sub(self.touch_start_ms);
+        if t < HOLD_HINT_MS {
+            return 0.0;
+        }
+        ((t - HOLD_HINT_MS) as f32 / (HOLD_MS - HOLD_HINT_MS) as f32).min(1.0)
+    }
+
     /// Needs another frame soon: something moves or pulses.
     pub fn animating(&self, st: &State, now: u32) -> bool {
         if self.page_x != 0.0 && !self.touching {
             return true;
+        }
+        if self.touching && self.pressed.is_some() && !self.held && !self.swiping {
+            return true; // hold filling up
         }
         if now.wrapping_sub(self.flash_ms) < FLASH_MS + 50
             || self.toast_ms.is_some_and(|t| now.wrapping_sub(t) < TOAST_MS + 50)

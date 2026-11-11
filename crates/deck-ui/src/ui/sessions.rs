@@ -104,6 +104,13 @@ impl Ui {
             let inside = if pressed { GREY_HI } else { GREY };
             c.round_rect(r.x + BORDER, r.y + BORDER, r.w - 2.0 * BORDER, r.h - 2.0 * BORDER, 0.0, inside, 1.0);
         }
+        // held: a bar fills along the top edge until the summary opens
+        let hold = self.hold_progress(i, now);
+        if hold > 0.0 {
+            let inset = if busy { 0.0 } else { BORDER };
+            let col = if busy { ON_ORANGE } else { TEXT };
+            c.round_rect(r.x + inset, r.y + inset, ((r.w - 2.0 * inset) * hold).round(), 4.0, 0.0, col, 1.0);
+        }
         if flash > 0.0 {
             c.round_rect(r.x, r.y, r.w, r.h, 0.0, WHITE, flash * 0.45);
         }
