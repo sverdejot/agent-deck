@@ -245,16 +245,14 @@ impl State {
                     ch.summary = true;
                 }
             }
-            "Q" if f.len() >= 2 => {
-                if self.summary.as_ref().is_some_and(|s| s.id == get(1)) {
-                    let fields = f.iter().skip(3).copied();
-                    let options: Vec<(u8, String)> = fields.filter_map(parse_option).take(MAX_OPTIONS).collect();
-                    let q = Question { id: get(1).into(), text: get(2).into(), options };
-                    let q = (!q.text.is_empty() && !q.options.is_empty()).then_some(q);
-                    if q != self.question {
-                        self.question = q;
-                        ch.summary = true;
-                    }
+            "Q" if f.len() >= 2 && self.summary.as_ref().is_some_and(|s| s.id == get(1)) => {
+                let fields = f.iter().skip(3).copied();
+                let options: Vec<(u8, String)> = fields.filter_map(parse_option).take(MAX_OPTIONS).collect();
+                let q = Question { id: get(1).into(), text: get(2).into(), options };
+                let q = (!q.text.is_empty() && !q.options.is_empty()).then_some(q);
+                if q != self.question {
+                    self.question = q;
+                    ch.summary = true;
                 }
             }
             "L" if f.len() >= 9 => {
