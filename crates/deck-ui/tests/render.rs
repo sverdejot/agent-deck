@@ -6,17 +6,17 @@ use deck_ui::ui::theme::{BG, GREY, ON_ORANGE, ORANGE};
 use deck_ui::ui::{Screen, Ui};
 
 const SAMPLE: [(&str, &str, &str, &str, i32); 5] = [
-    ("busy", "Detección de Seeedstudio SenseCap Indicator", "esp", "", 30),
-    ("ready", "Migración de Authentik a Pocket ID", "homelab", "ahora", 85),
-    ("wait", "Glance como PWA sin icono", "homelab", "hace 10 min", 12),
-    ("idle", "Revisión de sesiones pendientes", "repos", "hace 19 h", -1),
-    ("idle", "Fallo de DNS en home.lab", "homelab", "hace 11 h", 40),
+    ("busy", "Detect the Seeedstudio SenseCap Indicator", "esp", "", 30),
+    ("ready", "Migrate Authentik to Pocket ID", "homelab", "now", 85),
+    ("wait", "Glance PWA has no icon", "homelab", "10 min ago", 12),
+    ("idle", "Review pending sessions", "repos", "19 h ago", -1),
+    ("idle", "DNS failure on home.lab", "homelab", "11 h ago", 40),
 ];
 
 fn sample() -> State {
     let mut st = state_with(&SAMPLE);
-    st.feed(b"L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo: 100% a las 16:10\tahora\n", NOW);
-    st.feed(b"C\tB\nC\tH\t32\t4\t1,8 M\ttokens hoy\nC\tS\tesp\t464 k\t1,2,3,4\nC\tD\tL,M\t10,20\t1\nC\tE\n", NOW);
+    st.feed(b"L\t64\tresets 16:40\t90\t52\tresets Fri 22:00\t39\tAt this pace: 100% at 16:10\tnow\n", NOW);
+    st.feed(b"C\tB\nC\tH\t32\t4\t1.8 M\ttokens today\nC\tS\tesp\t464 k\t1,2,3,4\nC\tD\tM,T\t10,20\t1\nC\tE\n", NOW);
     st
 }
 
@@ -87,11 +87,11 @@ fn subagent_marks_on_the_tile() {
 fn summary_with_subagents_renders_in_bands() {
     let mut st = sample();
     st.summary = Some(Summary { id: "cli:0".into(), ..Default::default() });
-    st.feed(b"Y\tcli:0\tEmpezo hace 1 h\thola\tadios\tAgent: Buscar usos\n", NOW);
+    st.feed(b"Y\tcli:0\tStarted 1 h ago\thello\tbye\tAgent: Find uses\n", NOW);
     st.feed(
         concat!(
             "G\tB\tcli:0\n",
-            "G\tS\tcli:0\tExplore\tBuscar usos de tile_rect en todo el repositorio\t2 min\tGrep: tile_rect\n",
+            "G\tS\tcli:0\tExplore\tFind uses of tile_rect across the whole repository\t2 min\tGrep: tile_rect\n",
             "G\tS\tcli:0\tgeneral-purpose\tTests\t40 s\t\n",
             "G\tS\tcli:0\tPlan\tDiseno\t10 s\t\n",
             "G\tE\tcli:0\n",
@@ -170,7 +170,7 @@ fn question_summary_renders_in_bands() {
 #[test]
 fn tapping_an_option_answers_it() {
     let (mut st, mut ui) = asking();
-    // three options stacked above "Abrir sesión": the second one is around y = 318
+    // three options stacked above "Open session": the second one is around y = 318
     assert_eq!(ui.touch(&mut st, Some((240, 318)), NOW + 2000).0, None);
     let (msg, _) = ui.touch(&mut st, None, NOW + 2100);
     assert_eq!(msg.as_deref(), Some("A\tcli:2\t2\tYes, and don't ask again\n"));

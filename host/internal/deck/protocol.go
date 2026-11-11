@@ -119,9 +119,9 @@ func LimitsLine(l claude.Limits) string {
 func UsageLines(u claude.Usage) string {
 	var b strings.Builder
 	b.WriteString("C\tB\n")
-	sub := "tokens hoy"
+	sub := "tokens today"
 	if len(u.Series) > 0 {
-		sub = fmt.Sprintf("tokens hoy · %s el que más", u.Series[0].Name)
+		sub = fmt.Sprintf("tokens today · top: %s", u.Series[0].Name)
 	}
 	fmt.Fprintf(&b, "C\tH\t%d\t%d\t%s\t%s\n", u.Start, u.N, claude.HumanTokens(u.Total), Clean(sub, 60))
 	for _, s := range u.Series {

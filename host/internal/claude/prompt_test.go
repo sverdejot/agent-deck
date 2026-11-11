@@ -27,18 +27,18 @@ const (
 ╰──────────────────────────────────────────────────────────────────────────────╯
 `
 
-	screenAsk = `⏺ Antes de seguir necesito saber dónde van los iconos.
+	screenAsk = `⏺ Before going on I need to know where the icons go.
 
 ────────────────────────────────────────────────────────────────────────────────
- ←  ☐ Iconos  ✔ Submit  →
+ ←  ☐ Icons  ✔ Submit  →
 
-¿Dónde guardo los iconos de la PWA?
+Where should the PWA icons go?
 
-❯ 1. En /static
-     Servidos por Glance, sin paso de build
-  2. En un bucket de S3
-     Con su propia caché delante
-  3. Generarlos en el build
+❯ 1. In /static
+     Served by Glance, no build step
+  2. In an S3 bucket
+     With its own cache in front
+  3. Generate them at build time
   4. Type something.
 
 Enter to select · Tab/Arrow keys to navigate · Esc to cancel
@@ -51,10 +51,10 @@ Enter to select · Tab/Arrow keys to navigate · Esc to cancel
 
  Here is Claude's plan:
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ Arreglar el arranque del panel                                               │
+│ Fix the panel boot                                                           │
 │                                                                              │
-│ 1. Inicializar el expansor de E/S antes del bus SPI                          │
-│ 2. Probar en el deck                                                         │
+│ 1. Set up the I/O expander before the SPI bus                                │
+│ 2. Try it on the deck                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
  Would you like to proceed?
@@ -67,9 +67,9 @@ Enter to select · Tab/Arrow keys to navigate · Esc to cancel
  ctrl-g to edit in Vim
 `
 
-	screenIdle = `⏺ Hecho. Cambios:
-  1. Muevo la inicialización del expansor al principio
-  2. Pruebo de nuevo en el deck
+	screenIdle = `⏺ Done. Changes:
+  1. Move the expander init to the start
+  2. Try again on the deck
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
@@ -77,7 +77,7 @@ Enter to select · Tab/Arrow keys to navigate · Esc to cancel
   ⏵⏵ accept edits on (shift+tab to cycle)
 `
 
-	screenMulti = `¿Qué bases de datos soportamos?
+	screenMulti = `Which databases do we support?
 
 ❯ 1. [ ] Postgres
   2. [✔] SQLite
@@ -103,8 +103,8 @@ func TestParseMenu(t *testing.T) {
 			},
 		}, true},
 		{"AskUserQuestion", screenAsk, Prompt{
-			Question: "¿Dónde guardo los iconos de la PWA?",
-			Options:  []Option{{1, "En /static"}, {2, "En un bucket de S3"}, {3, "Generarlos en el build"}},
+			Question: "Where should the PWA icons go?",
+			Options:  []Option{{1, "In /static"}, {2, "In an S3 bucket"}, {3, "Generate them at build time"}},
 		}, true},
 		{"plan approval", screenPlan, Prompt{
 			Question: "Would you like to proceed?",
@@ -128,8 +128,8 @@ func TestParseMenu(t *testing.T) {
 
 func TestParseMenuOnlyAtTheBottom(t *testing.T) {
 	// a menu that scrolled up, with Claude's output under it, is not waiting any more
-	screen := screenAsk + "\n⏺ Vale, en /static.\n\n⏺ Write(static/icon-192.png)\n  ⎿  Wrote 1 line\n" +
-		"\n⏺ Write(static/icon-512.png)\n  ⎿  Wrote 1 line\n\n⏺ Listo.\n"
+	screen := screenAsk + "\n⏺ OK, in /static.\n\n⏺ Write(static/icon-192.png)\n  ⎿  Wrote 1 line\n" +
+		"\n⏺ Write(static/icon-512.png)\n  ⎿  Wrote 1 line\n\n⏺ Done.\n"
 	if p, ok := ParseMenu(screen); ok {
 		t.Errorf("stale menu parsed: %+v", p)
 	}
@@ -142,18 +142,18 @@ func TestEnrichFromTranscript(t *testing.T) {
 	dir := filepath.Join(Home, ".claude", "projects", "-Users-sam-glance")
 	must(t, os.MkdirAll(dir, 0o755))
 	ask := `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_1","name":"AskUserQuestion",` +
-		`"input":{"questions":[{"question":"¿Dónde guardo los iconos de la PWA, para que Glance los sirva?",` +
-		`"options":[{"label":"En /static"},{"label":"En un bucket de S3"},{"label":"Generarlos en el build"}]}]}}]}}`
+		`"input":{"questions":[{"question":"Where should the PWA icons go, so that Glance serves them?",` +
+		`"options":[{"label":"In /static"},{"label":"In an S3 bucket"},{"label":"Generate them at build time"}]}]}}]}}`
 	path := filepath.Join(dir, "s1.jsonl")
 	must(t, os.WriteFile(path, []byte(ask+"\n"), 0o644))
 
 	shown, _ := ParseMenu(screenAsk)
 	got := Enrich(Session{SessionID: "s1"}, shown)
-	if got.Question != "¿Dónde guardo los iconos de la PWA, para que Glance los sirva?" {
+	if got.Question != "Where should the PWA icons go, so that Glance serves them?" {
 		t.Errorf("pending question: %q", got.Question)
 	}
 
-	answered := ask + "\n" + `{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"En /static"}]}}`
+	answered := ask + "\n" + `{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"In /static"}]}}`
 	must(t, os.WriteFile(path, []byte(answered+"\n"), 0o644))
 	if got := Enrich(Session{SessionID: "s1"}, shown); got.Question != shown.Question {
 		t.Errorf("answered question still used: %q", got.Question)

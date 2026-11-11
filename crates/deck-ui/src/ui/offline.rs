@@ -27,7 +27,7 @@ pub(super) fn draw(c: &mut Canvas, ever_linked: bool) {
     let mid = W as f32 / 2.0;
     draw_mark(c, mid, 170.0, ON_ORANGE);
     c.text_centered(&fonts::BIG, "agent deck", mid, 302.0, ON_ORANGE, 1.0);
-    let msg = if ever_linked { "Sin conexión con el ordenador" } else { "Conecta el deck al ordenador" };
+    let msg = if ever_linked { "Lost the link to the computer" } else { "Connect the deck to the computer" };
     c.text_centered(&fonts::SUB, msg, mid, 352.0, ON_ORANGE_MUTED, 1.0);
-    c.text_centered(&fonts::SUB, "y ejecuta agent-deck", mid, 378.0, ON_ORANGE_MUTED, 1.0);
+    c.text_centered(&fonts::SUB, "and run agent-deck", mid, 378.0, ON_ORANGE_MUTED, 1.0);
 }

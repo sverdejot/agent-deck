@@ -1,7 +1,7 @@
 //! Agent Deck — firmware for the SenseCAP Indicator D1 (ESP32-S3).
 //!
 //! Shows the Claude Code terminal sessions open on the Mac and opens the one you tap; the side
-//! button cycles Sesiones → Límites → Consumo (long press dims). Everything on screen comes from
+//! button cycles Sessions → Limits → Usage (long press dims). Everything on screen comes from
 //! the `deck-ui` crate; this binary supplies the hardware: panel, touch, button, backlight, serial
 //! link and the clock. The Mac side is `../host` (see `docs/protocol.md`).
 

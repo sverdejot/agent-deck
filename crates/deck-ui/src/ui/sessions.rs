@@ -1,4 +1,4 @@
-//! Sesiones screen: one tile per session (empty slots of a short last row outlined). Colour is
+//! Sessions screen: one tile per session (empty slots of a short last row outlined). Colour is
 //! the state: working = solid orange, needs you = pulsing orange border, ready = orange border,
 //! idle = faint border. Repo in small caps at the top, title anchored to the bottom, age under it,
 //! context-window bar along the bottom edge.
@@ -171,7 +171,7 @@ fn marks_width(n: u32) -> f32 {
 }
 
 /// Subagents at work, at the right of the tile's header row: one small square per subagent (the
-/// legend markers of Uso), or a square and the count when there are more than [`MARKS`]. `y` is
+/// legend markers of Usage), or a square and the count when there are more than [`MARKS`]. `y` is
 /// the top of the header text.
 fn draw_marks(c: &mut Canvas, n: u32, right: f32, y: f32, col: Rgb) {
     let x = right - marks_width(n);

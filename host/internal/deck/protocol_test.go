@@ -24,7 +24,7 @@ func TestClean(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	ss := []claude.Session{
 		{ID: "cli:1", State: "busy", Title: "Uno\tcon tab", Place: "esp"},
-		{ID: "cli:2", State: "idle", Title: "Dos", Place: "homelab", Age: "hace 3 h", Agents: 2},
+		{ID: "cli:2", State: "idle", Title: "Two", Place: "homelab", Age: "3 h ago", Agents: 2},
 	}
 	got := Snapshot(ss, func(s claude.Session) int {
 		if s.ID == "cli:1" {
@@ -34,7 +34,7 @@ func TestSnapshot(t *testing.T) {
 	})
 	want := "B\n" +
 		"S\tcli:1\tcode\tbusy\tUno con tab\tesp\t\t30\t0\n" +
-		"S\tcli:2\tcode\tidle\tDos\thomelab\thace 3 h\t-1\t2\n" +
+		"S\tcli:2\tcode\tidle\tTwo\thomelab\t3 h ago\t-1\t2\n" +
 		"E\n"
 	if got != want {
 		t.Errorf("Snapshot =\n%q\nwant\n%q", got, want)
@@ -42,9 +42,9 @@ func TestSnapshot(t *testing.T) {
 }
 
 func TestLimitsLine(t *testing.T) {
-	l := claude.Limits{Five: 64, FiveReset: "reinicia 16:40", FiveElapsed: 90, Week: 52, WeekReset: "reinicia vie 22:00",
-		WeekElapsed: 39, Projection: "A este ritmo no llegas al límite", Updated: "ahora"}
-	want := "L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo no llegas al límite\tahora\n"
+	l := claude.Limits{Five: 64, FiveReset: "resets 16:40", FiveElapsed: 90, Week: 52, WeekReset: "resets Fri 22:00",
+		WeekElapsed: 39, Projection: "At this pace you won't hit the limit", Updated: "now"}
+	want := "L\t64\tresets 16:40\t90\t52\tresets Fri 22:00\t39\tAt this pace you won't hit the limit\tnow\n"
 	if got := LimitsLine(l); got != want {
 		t.Errorf("LimitsLine = %q", got)
 	}
@@ -54,14 +54,14 @@ func TestUsageLines(t *testing.T) {
 	u := claude.Usage{
 		Start: 32, N: 3, Total: 1_812_000,
 		Series: []claude.Series{{Name: "homelab", Total: 1_300_000, Values: []int64{0, 205_400, 599_999}}},
-		Days:   []claude.Day{{Label: "L", Tokens: 10_000}, {Label: "M", Tokens: 20_500}},
+		Days:   []claude.Day{{Label: "M", Tokens: 10_000}, {Label: "T", Tokens: 20_500}},
 	}
 	got := strings.Split(strings.TrimSuffix(UsageLines(u), "\n"), "\n")
 	want := []string{
 		"C\tB",
-		"C\tH\t32\t3\t1,8 M\ttokens hoy · homelab el que más",
-		"C\tS\thomelab\t1,3 M\t0,205,599",
-		"C\tD\tL,M\t10,20\t1",
+		"C\tH\t32\t3\t1.8 M\ttokens today · top: homelab",
+		"C\tS\thomelab\t1.3 M\t0,205,599",
+		"C\tD\tM,T\t10,20\t1",
 		"C\tE",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -70,8 +70,8 @@ func TestUsageLines(t *testing.T) {
 }
 
 func TestSummaryLine(t *testing.T) {
-	got := SummaryLine("cli:1", claude.Summary{Meta: "m", You: "hola\nqué tal", Claude: "c", Tool: ""})
-	if got != "Y\tcli:1\tm\thola qué tal\tc\t\n" {
+	got := SummaryLine("cli:1", claude.Summary{Meta: "m", You: "hello\nhow are you", Claude: "c", Tool: ""})
+	if got != "Y\tcli:1\tm\thello how are you\tc\t\n" {
 		t.Errorf("SummaryLine = %q", got)
 	}
 }

@@ -12,7 +12,7 @@ import (
 
 // Summary is what the deck shows when a tile is held: built from the transcript, no model call.
 type Summary struct {
-	Meta   string // "Empezó hace 3 h · 12 mensajes · esp"
+	Meta   string // "Started 3 h ago · 12 messages · esp"
 	You    string // your last message
 	Claude string // Claude's last text reply
 	Tool   string // tool running right now (busy sessions)
@@ -82,16 +82,16 @@ func Summarize(s Session) Summary {
 	}
 	var meta []string
 	if !first.IsZero() {
-		meta = append(meta, "Empezó "+Ago(first))
+		meta = append(meta, "Started "+Ago(first))
 	}
 	if turns == 1 {
-		meta = append(meta, "1 mensaje")
+		meta = append(meta, "1 message")
 	} else if turns > 1 {
-		meta = append(meta, fmt.Sprintf("%d mensajes", turns))
+		meta = append(meta, fmt.Sprintf("%d messages", turns))
 	}
 	meta = append(meta, s.Place)
 	if s.Age != "" {
-		meta = append(meta, "activa "+s.Age)
+		meta = append(meta, "active "+s.Age)
 	}
 	sum.Meta = strings.Join(meta, " · ")
 	sum.You = plain(sum.You)
@@ -139,7 +139,7 @@ var (
 
 // plain turns markdown into one line of plain text for the small screen.
 func plain(s string) string {
-	s = reCode.ReplaceAllString(s, " [código] ")
+	s = reCode.ReplaceAllString(s, " [code] ")
 	s = reBullet.ReplaceAllString(s, "· ")
 	s = reMarks.ReplaceAllString(s, "")
 	return strings.TrimSpace(reSpaces.ReplaceAllString(s, " "))

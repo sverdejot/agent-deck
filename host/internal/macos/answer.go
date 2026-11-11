@@ -19,7 +19,7 @@ func Screen(tmuxPane string) (string, error) {
 // it, without focusing the terminal.
 func Answer(tmuxPane string, n int) error {
 	if n < 1 || n > 9 {
-		return fmt.Errorf("opción %d fuera de rango", n)
+		return fmt.Errorf("option %d out of range", n)
 	}
 	return run(tmuxPath(), "send-keys", "-t", tmuxPane, strconv.Itoa(n))
 }

@@ -10,14 +10,14 @@ use crate::gfx::{fonts, Canvas, Rgb, H, W};
 use crate::protocol::{Question, Session, State, Subagent, Summary};
 use crate::text::{fit, wrap};
 
-/// Taps below this line hit the "Abrir sesión" button.
+/// Taps below this line hit the "Open session" button.
 pub const OPEN_BUTTON_Y: i32 = H - 80;
-/// Rows of the SUBAGENTES block, "+n más" included.
+/// Rows of the SUBAGENTS block, "+n more" included.
 const AGENT_ROWS: usize = 4;
 
-/// With a question, "Abrir sesión" becomes a quiet text link at the very bottom.
+/// With a question, "Open session" becomes a quiet text link at the very bottom.
 const Q_OPEN_CY: f32 = H as f32 - 28.0;
-/// Taps below this line hit "Abrir sesión" when a question is on screen.
+/// Taps below this line hit "Open session" when a question is on screen.
 pub const Q_OPEN_BUTTON_Y: i32 = H - 54;
 /// Option rows: flat and square like the tiles, finger-sized, stacked up from above the link.
 const OPTION_H: f32 = 60.0;
@@ -48,7 +48,7 @@ pub(super) fn option_at(n: usize, x: i32, y: i32) -> Option<usize> {
 /// `pressed`: index of the option under the finger, highlighted.
 pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<usize>) {
     let Some(s) = st.sessions.iter().find(|s| s.id == sum.id) else {
-        draw_centered(c, "La sesión ya no existe", None);
+        draw_centered(c, "This session is gone", None);
         return;
     };
     if let Some(q) = st.question_for(&sum.id) {
@@ -86,16 +86,16 @@ pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<us
             }
             *y += lines.len() as i32 * lh + 12;
         };
-        block(c, &mut y, "AHORA", ORANGE, &sum.tool, 2);
+        block(c, &mut y, "NOW", ORANGE, &sum.tool, 2);
         agents_block(c, &mut y, x, w, bottom_limit, &sum.agents);
-        block(c, &mut y, "TÚ", MUTED, &sum.you, 3);
+        block(c, &mut y, "YOU", MUTED, &sum.you, 3);
         block(c, &mut y, "CLAUDE", ORANGE, &sum.claude, 6);
     } else {
-        c.text(&fonts::SUB, "Cargando…", x, y + 10, MUTED, 0, 1.0);
+        c.text(&fonts::SUB, "Loading…", x, y + 10, MUTED, 0, 1.0);
     }
 
     c.round_rect(x as f32, (H - 72) as f32, w as f32, 52.0, 26.0, ORANGE, 1.0);
-    c.text_centered(&fonts::TITLE, "Abrir sesión", W as f32 / 2.0, (H - 46) as f32, ON_ORANGE, 1.0);
+    c.text_centered(&fonts::TITLE, "Open session", W as f32 / 2.0, (H - 46) as f32, ON_ORANGE, 1.0);
 }
 
 /// State label in a rounded pill at (x, y); returns its width.
@@ -110,10 +110,10 @@ fn pill(c: &mut Canvas, s: &Session, x: i32, y: i32) -> i32 {
 
 /// Claude is waiting on a menu. Laid out like the other screens: a tracked label with the session
 /// on the right, the question in the heading font, then one flat row per option and a quiet
-/// "Abrir sesión" link at the bottom.
+/// "Open session" link at the bottom.
 fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usize>) {
     let (x, w) = (MARGIN as i32, W - 2 * MARGIN as i32);
-    let label = "TE NECESITA";
+    let label = "NEEDS YOU";
     c.text(&fonts::TAG, label, x, 22, ORANGE, 2, 1.0);
     let lw = fonts::TAG.width(label, 2) + 16;
     let title = fit(&fonts::SUB, &s.title, w - lw);
@@ -132,7 +132,7 @@ fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usiz
         option_row(c, option_rect(n, k), *num, label, pressed == Some(k));
     }
 
-    c.text_centered(&fonts::SUB, "Abrir sesión", W as f32 / 2.0, Q_OPEN_CY, MUTED, 1.0);
+    c.text_centered(&fonts::SUB, "Open session", W as f32 / 2.0, Q_OPEN_CY, MUTED, 1.0);
 }
 
 /// One option: a flat grey row (square, like an idle tile) with its number in orange and the label,
@@ -154,16 +154,16 @@ fn option_row(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
     }
 }
 
-/// SUBAGENTES: one row per running subagent, like the Uso legend: a square marker, what it was
+/// SUBAGENTS: one row per running subagent, like the Usage legend: a square marker, what it was
 /// asked to do, and how long it has been running on the right; with one or two, its type and what
 /// it is doing now in grey under it. Never more than [`AGENT_ROWS`] rows: the rest are counted in a
-/// "+n más" row.
+/// "+n more" row.
 fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents: &[Subagent]) {
     let lh = fonts::SUB.line_height();
     if agents.is_empty() || *y + 20 + lh > bottom {
         return;
     }
-    c.text(&fonts::TAG, &format!("SUBAGENTES · {}", agents.len()), x, *y, ORANGE, 1, 1.0);
+    c.text(&fonts::TAG, &format!("SUBAGENTS · {}", agents.len()), x, *y, ORANGE, 1, 1.0);
     *y += 20;
     let room = usize::try_from((bottom - *y) / lh).unwrap_or(0).clamp(1, AGENT_ROWS);
     let shown = if agents.len() > room { (room - 1).max(1) } else { agents.len() };
@@ -189,7 +189,7 @@ fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents
         }
     }
     if shown < agents.len() && shown < room {
-        c.text(&fonts::SUB, &format!("+{} más", agents.len() - shown), x + indent, *y, MUTED, 0, 1.0);
+        c.text(&fonts::SUB, &format!("+{} more", agents.len() - shown), x + indent, *y, MUTED, 0, 1.0);
         *y += lh;
     }
     *y += 12;

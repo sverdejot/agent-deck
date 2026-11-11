@@ -21,7 +21,7 @@ type Session struct {
 	State   string    // busy | wait | ready | idle
 	Title   string    // name given by the user, else the AI title of the transcript
 	Place   string    // repository name (or short path)
-	Age     string    // "hace 3 h"; empty while working
+	Age     string    // "3 h ago"; empty while working
 	When    time.Time // last activity
 	Started time.Time // sessions are listed oldest first, so tiles keep their place
 	Agents  int       // subagents running now
@@ -242,22 +242,22 @@ func ShortPath(p string) string {
 	return p
 }
 
-// Ago says how long ago t was, in Spanish ("ahora", "hace 5 min", "hace 3 h", "hace 2 d").
+// Ago says how long ago t was ("now", "5 min ago", "3 h ago", "2 d ago").
 func Ago(t time.Time) string { return agoAt(t, time.Now()) }
 
 func agoAt(t, now time.Time) string {
 	d := now.Sub(t)
 	switch {
 	case d < time.Minute:
-		return "ahora"
+		return "now"
 	case d < time.Hour:
-		return fmt.Sprintf("hace %d min", int(d.Minutes()))
+		return fmt.Sprintf("%d min ago", int(d.Minutes()))
 	case d < 24*time.Hour:
-		return fmt.Sprintf("hace %d h", int(d.Hours()))
+		return fmt.Sprintf("%d h ago", int(d.Hours()))
 	}
-	return fmt.Sprintf("hace %d d", int(d.Hours()/24))
+	return fmt.Sprintf("%d d ago", int(d.Hours()/24))
 }
 
 func weekday(t time.Time) string {
-	return [...]string{"dom", "lun", "mar", "mié", "jue", "vie", "sáb"}[t.Weekday()]
+	return t.Format("Mon")
 }

@@ -3,7 +3,7 @@
 
 /// No message for this long and the link counts as lost.
 pub const LINK_TIMEOUT_MS: u32 = 7000;
-/// Most repos shown in the Usage chart (the Mac folds the rest into "otros").
+/// Most repos shown in the Usage chart (the Mac folds the rest into "others").
 pub const MAX_SERIES: usize = 4;
 /// 15-minute buckets in a day.
 pub const MAX_BUCKETS: usize = 96;
@@ -39,7 +39,7 @@ pub struct Session {
     pub title: String,
     /// repository name (or short path)
     pub place: String,
-    /// "hace 3 h"; empty while working
+    /// "3 h ago"; empty while working
     pub age: String,
     /// context window used, 0-100; -1 unknown
     pub ctx: i32,
@@ -58,10 +58,10 @@ impl Session {
 
     pub fn state_label(&self) -> &'static str {
         match self.state.as_str() {
-            "busy" => "Trabajando",
-            "wait" => "Te necesita",
-            "ready" => "Lista",
-            _ => "Inactiva",
+            "busy" => "Working",
+            "wait" => "Needs you",
+            "ready" => "Ready",
+            _ => "Idle",
         }
     }
 }

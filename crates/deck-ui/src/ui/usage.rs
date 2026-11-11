@@ -1,4 +1,4 @@
-//! Consumo screen: today's tokens in 15-minute stacked bars (one colour per repo), legend, and the
+//! Usage screen: today's tokens in 15-minute stacked bars (one colour per repo), legend, and the
 //! last 7 days.
 
 use super::draw_centered;
@@ -9,10 +9,10 @@ use crate::text::fit;
 
 pub(super) fn draw(c: &mut Canvas, st: &State) {
     let Some(u) = &st.usage else {
-        draw_centered(c, "Calculando consumo…", None);
+        draw_centered(c, "Calculating usage…", None);
         return;
     };
-    c.text(&fonts::TAG, "CONSUMO HOY", 24, 22, FAINT, 2, 1.0);
+    c.text(&fonts::TAG, "USAGE TODAY", 24, 22, FAINT, 2, 1.0);
     c.text(&fonts::BIG, &u.total, 24, 44, TEXT, 0, 1.0);
     c.text(&fonts::SUB, &u.subtitle, 24, 96, MUTED, 0, 1.0);
 
@@ -55,7 +55,7 @@ pub(super) fn draw(c: &mut Canvas, st: &State) {
     }
 
     // last 7 days
-    c.text(&fonts::TAG, "ÚLTIMOS 7 DÍAS", 24, 372, FAINT, 2, 1.0);
+    c.text(&fonts::TAG, "LAST 7 DAYS", 24, 372, FAINT, 2, 1.0);
     let dmax = u.days.iter().map(|d| d.1).max().unwrap_or(0).max(1);
     let dslot = (W - 48) as f32 / 7.0;
     for (d, (label, v)) in u.days.iter().enumerate() {

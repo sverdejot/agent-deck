@@ -31,7 +31,7 @@ E
 | `state` | — | `busy` working · `wait` needs you · `ready` finished < 30 min ago · `idle` |
 | `title` | 94 | name given by the user, else the transcript's AI title |
 | `place` | 70 | git repository name (worktrees → main repo), else a short path |
-| `age` | 22 | `ahora`, `hace 5 min`, `hace 3 h`…; empty while `busy` |
+| `age` | 22 | `now`, `5 min ago`, `3 h ago`…; empty while `busy` |
 | `ctx` | — | context window used, 0-100; `-1` unknown (optional, defaults to -1) |
 | `agents` | — | subagents running now (optional, defaults to 0; needs `ctx` before it) |
 
@@ -41,7 +41,7 @@ E
 Y  <id> <meta> <you> <claude> <tool>
 ```
 
-`meta` (150): "Empezó hace 3 h · 12 mensajes · esp · activa ahora". `you` / `claude` (600): last
+`meta` (150): "Started 3 h ago · 12 messages · esp · active now". `you` / `claude` (600): last
 message of each side, markdown flattened to one line. `tool` (150): tool running now ("Bash:
 go build"), only while `busy`.
 
@@ -88,8 +88,8 @@ L  <five> <fiveReset> <fiveElapsed> <week> <weekReset> <weekElapsed> <projection
 ```
 
 `five` / `week`: % of the 5-hour / weekly plan window used (`-1` until there is a reading).
-`*Reset`: "reinicia 16:40", "reinicia vie 22:00". `*Elapsed`: % of the window already gone (the
-pace marker). `projection`: "A este ritmo: 100% a las 17:10" / "A este ritmo no llegas al límite".
+`*Reset`: "resets 16:40", "resets Fri 22:00". `*Elapsed`: % of the window already gone (the
+pace marker). `projection`: "At this pace: 100% at 17:10" / "At this pace you won't hit the limit".
 `updated`: age of the reading. All strings ≤ 100 bytes.
 
 The data comes from Claude Code's statusline input, recorded by `agent-deck statusline`.
@@ -99,13 +99,13 @@ The data comes from Claude Code's statusline input, recorded by `agent-deck stat
 ```
 C  B                                       start
 C  H  <start> <n> <total> <subtitle>       today's chart: n 15-minute buckets from bucket <start>
-C  S  <name> <total> <v,v,…>               one per repo (≤ 4, the rest folded into "otros")
+C  S  <name> <total> <v,v,…>               one per repo (≤ 4, the rest folded into "others")
 C  D  <labels> <values> <today>            last 7 days, oldest first; <today> is its index
 C  E                                       commit: the deck shows the block now
 ```
 
 Buckets count from midnight (bucket 32 = 08:00). Values are **thousands of tokens** (input +
-cache writes + output; cache reads are left out). `total` is preformatted ("1,8 M", "464 k").
+cache writes + output; cache reads are left out). `total` is preformatted ("1.8 M", "464 k").
 
 ## Deck → Mac
 

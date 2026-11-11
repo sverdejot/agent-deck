@@ -22,7 +22,7 @@ const BucketsPerHour = 4
 
 const (
 	bucketsPerDay = 24 * BucketsPerHour
-	maxSeries     = 4 // repos shown; the rest are folded into "otros"
+	maxSeries     = 4 // repos shown; the rest are folded into "others"
 )
 
 // Series is one repo's tokens per bucket.
@@ -34,7 +34,7 @@ type Series struct {
 
 // Day is the total of one day.
 type Day struct {
-	Label  string // "L", "M", "X"…
+	Label  string // "M", "T", "W"…
 	Tokens int64
 }
 
@@ -211,12 +211,12 @@ func anyAt(perRepo map[string]*[bucketsPerDay]int64, i int) bool {
 	return false
 }
 
-// foldOthers keeps the biggest series and adds up the rest as "otros" (input sorted, biggest first).
+// foldOthers keeps the biggest series and adds up the rest as "others" (input sorted, biggest first).
 func foldOthers(series []Series) []Series {
 	if len(series) <= maxSeries {
 		return series
 	}
-	other := Series{Name: "otros", Values: make([]int64, len(series[0].Values))}
+	other := Series{Name: "others", Values: make([]int64, len(series[0].Values))}
 	for _, s := range series[maxSeries-1:] {
 		other.Total += s.Total
 		for i, v := range s.Values {
@@ -226,11 +226,11 @@ func foldOthers(series []Series) []Series {
 	return append(series[:maxSeries-1:maxSeries-1], other)
 }
 
-// HumanTokens formats a token count for the screen: "1,8 M", "464 k", "950".
+// HumanTokens formats a token count for the screen: "1.8 M", "464 k", "950".
 func HumanTokens(n int64) string {
 	switch {
 	case n >= 1_000_000:
-		return strings.Replace(fmt.Sprintf("%.1f M", float64(n)/1e6), ".", ",", 1)
+		return fmt.Sprintf("%.1f M", float64(n)/1e6)
 	case n >= 1000:
 		return fmt.Sprintf("%d k", n/1000)
 	}

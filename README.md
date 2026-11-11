@@ -66,7 +66,6 @@ mise run fw:flash                # flash the deck (stop agent-deck first: it hol
 ## Limitations
 
 - macOS only; focusing a session needs tmux + Ghostty, answering its questions needs tmux.
-- The deck's labels are in Spanish.
 - Only sessions started from a terminal are shown (not the Claude desktop app or claude.ai).
 
 ## License

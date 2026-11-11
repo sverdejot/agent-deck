@@ -1,10 +1,10 @@
 //! Screens and gestures.
 //!
-//! The side button cycles Sesiones → Límites → Consumo (the firmware calls [`Ui::next_screen`]).
-//! On Sesiones a tap opens the session on the Mac, holding it shows its summary, and with more
+//! The side button cycles Sessions → Limits → Usage (the firmware calls [`Ui::next_screen`]).
+//! On Sessions a tap opens the session on the Mac, holding it shows its summary, and with more
 //! than 9 sessions pages are swiped sideways. When the session is waiting on a menu (a question,
 //! a permission, a plan approval) its summary has one button per option to answer from the deck.
-//! Límites and Consumo are read-only. Without a link to the Mac every screen gives way to the
+//! Limits and Usage are read-only. Without a link to the Mac every screen gives way to the
 //! offline screen.
 
 pub mod grid;
@@ -39,9 +39,9 @@ impl Screen {
 
     pub fn name(self) -> &'static str {
         match self {
-            Screen::Sessions => "Sesiones",
-            Screen::Limits => "Límites",
-            Screen::Usage => "Consumo",
+            Screen::Sessions => "Sessions",
+            Screen::Limits => "Limits",
+            Screen::Usage => "Usage",
         }
     }
 
@@ -120,7 +120,7 @@ impl Ui {
             Screen::Sessions => match &st.summary {
                 Some(sum) => summary::draw(c, st, sum, self.pressed_option),
                 None if st.sessions.is_empty() => {
-                    draw_centered(c, "Sin sesiones abiertas", Some("Abre Claude Code en la terminal"));
+                    draw_centered(c, "No open sessions", Some("Start Claude Code in a terminal"));
                 }
                 None => self.draw_sessions(c, st, now),
             },
@@ -293,7 +293,7 @@ impl Ui {
                 msg = Some(m);
                 st.question = None; // until the Mac sends what comes next
                 self.summary_opened_ms = now;
-                self.toast_text = "Respuesta enviada";
+                self.toast_text = "Answer sent";
                 self.toast_ms = Some(now);
             } else if !on_option && ty >= open_y {
                 msg = Some(self.open(&id, now));

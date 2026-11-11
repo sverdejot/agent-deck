@@ -49,10 +49,10 @@ func main() {
 		exe, err := macos.InstallBinary()
 		must(err)
 		must(macos.InstallLaunchAgent(exe))
-		fmt.Printf("instalado: %s\nlog: %s\n", macos.AgentPath(), macos.LogPath())
+		fmt.Printf("installed: %s\nlog: %s\n", macos.AgentPath(), macos.LogPath())
 	case "uninstall":
 		must(macos.UninstallLaunchAgent())
-		fmt.Println("desinstalado")
+		fmt.Println("uninstalled")
 	case "install-statusline":
 		exe, err := macos.InstallBinary()
 		must(err)
@@ -76,7 +76,7 @@ func list(verbose bool) {
 		fmt.Printf("%-6s %-40.40s %-16s %s\n", s.State, s.Title, s.Place, s.Age)
 		if verbose {
 			sum := claude.Summarize(s)
-			fmt.Printf("       meta:   %s\n       tú:     %.120s\n       claude: %.120s\n       ahora:  %s\n",
+			fmt.Printf("       meta:   %s\n       you:    %.120s\n       claude: %.120s\n       now:    %s\n",
 				sum.Meta, sum.You, sum.Claude, sum.Tool)
 		}
 	}

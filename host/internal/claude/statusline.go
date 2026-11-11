@@ -96,7 +96,7 @@ func replaceCommand(settings []byte, old, new string) ([]byte, error) {
 	o, _ := json.Marshal(old)
 	n, _ := json.Marshal(new)
 	if bytes.Count(settings, o) != 1 {
-		return nil, fmt.Errorf("no encuentro statusLine.command de forma inequívoca en settings.json")
+		return nil, fmt.Errorf("can't find a unique statusLine.command in settings.json")
 	}
 	return bytes.Replace(settings, o, n, 1), nil
 }
@@ -113,11 +113,11 @@ func InstallStatusline(exe string) error {
 		return err
 	}
 	if strings.Contains(cur, " statusline --") || strings.HasSuffix(cur, " statusline") {
-		fmt.Println("statusline ya conectada")
+		fmt.Println("statusline already hooked up")
 		return nil
 	}
 	if cur == "" {
-		return fmt.Errorf("no hay statusLine en settings.json; añade una (aunque sea `true`) y vuelve a ejecutar")
+		return fmt.Errorf("no statusLine in settings.json; add one (even just `true`) and run this again")
 	}
 	next := fmt.Sprintf("%q statusline -- sh -c %q", exe, cur)
 	out, err := replaceCommand(b, cur, next)
@@ -128,7 +128,7 @@ func InstallStatusline(exe string) error {
 	if err := os.WriteFile(settingsPath(), out, 0o600); err != nil {
 		return err
 	}
-	fmt.Printf("statusline conectada (copia en %s.agent-deck.bak)\n", settingsPath())
+	fmt.Printf("statusline hooked up (backup in %s.agent-deck.bak)\n", settingsPath())
 	return nil
 }
 
@@ -144,12 +144,12 @@ func UninstallStatusline() error {
 	}
 	i := strings.Index(cur, " statusline -- sh -c ")
 	if i < 0 {
-		fmt.Println("statusline no estaba conectada")
+		fmt.Println("statusline was not hooked up")
 		return nil
 	}
 	var orig string
 	if _, err := fmt.Sscanf(cur[i+len(" statusline -- sh -c "):], "%q", &orig); err != nil {
-		return fmt.Errorf("no puedo recuperar el comando original: %v", err)
+		return fmt.Errorf("can't recover the original command: %v", err)
 	}
 	out, err := replaceCommand(b, cur, orig)
 	if err != nil {
@@ -158,6 +158,6 @@ func UninstallStatusline() error {
 	if err := os.WriteFile(settingsPath(), out, 0o600); err != nil {
 		return err
 	}
-	fmt.Println("statusline restaurada")
+	fmt.Println("statusline restored")
 	return nil
 }

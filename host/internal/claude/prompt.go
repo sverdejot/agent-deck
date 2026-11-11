@@ -153,7 +153,7 @@ func question(above []string) string {
 	para, rest := paragraph(above)
 	q := strings.Join(para, " ")
 	if q == "" {
-		return "Claude espera tu respuesta"
+		return "Claude is waiting for your answer"
 	}
 	if strings.HasPrefix(q, "Do you want to proceed") {
 		if ctx, _ := paragraph(rest); len(ctx) > 0 {

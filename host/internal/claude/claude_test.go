@@ -57,10 +57,10 @@ func TestPlace(t *testing.T) {
 func TestAgo(t *testing.T) {
 	now := time.Now()
 	for d, want := range map[time.Duration]string{
-		10 * time.Second: "ahora",
-		5 * time.Minute:  "hace 5 min",
-		3 * time.Hour:    "hace 3 h",
-		50 * time.Hour:   "hace 2 d",
+		10 * time.Second: "now",
+		5 * time.Minute:  "5 min ago",
+		3 * time.Hour:    "3 h ago",
+		50 * time.Hour:   "2 d ago",
 	} {
 		if got := agoAt(now.Add(-d), now); got != want {
 			t.Errorf("agoAt(-%v) = %q, want %q", d, got, want)
@@ -100,27 +100,27 @@ func TestProject(t *testing.T) {
 
 	// 40% → 60% in 30 min: 40% left at 0.667%/min → 60 min → 16:00, before the reset at 17:00
 	got := project(&window{UsedPercentage: 60}, reset, now, history(pt{0, 60}, pt{30 * time.Minute, 40}))
-	if got != "A este ritmo: 100% a las 16:00" {
+	if got != "At this pace: 100% at 16:00" {
 		t.Errorf("fast pace: %q", got)
 	}
 	// 59% → 60% in 30 min: would take 20 h, after the reset
 	got = project(&window{UsedPercentage: 60}, reset, now, history(pt{0, 60}, pt{30 * time.Minute, 59}))
-	if got != "A este ritmo no llegas al límite" {
+	if got != "At this pace you won't hit the limit" {
 		t.Errorf("slow pace: %q", got)
 	}
 	// only 5 minutes of history
 	got = project(&window{UsedPercentage: 60}, reset, now, history(pt{0, 60}, pt{5 * time.Minute, 50}))
-	if got != "Ritmo: aún sin datos suficientes" {
+	if got != "Pace: not enough data yet" {
 		t.Errorf("little history: %q", got)
 	}
-	if got := project(&window{UsedPercentage: 100}, reset, now, history()); got != "Límite alcanzado · reinicia 17:00" {
+	if got := project(&window{UsedPercentage: 100}, reset, now, history()); got != "Limit reached · resets 17:00" {
 		t.Errorf("at the limit: %q", got)
 	}
 }
 
 func TestPlain(t *testing.T) {
-	in := "## Hecho\n\n- **uno**\n- `dos`\n\n```go\nfmt.Println()\n```\nfin"
-	if got := plain(in); got != "Hecho · uno · dos [código] fin" {
+	in := "## Done\n\n- **one**\n- `two`\n\n```go\nfmt.Println()\n```\nend"
+	if got := plain(in); got != "Done · one · two [code] end" {
 		t.Errorf("plain = %q", got)
 	}
 }
@@ -144,7 +144,7 @@ func TestFoldOthers(t *testing.T) {
 		series = append(series, Series{Name: name, Total: int64(50 - i), Values: []int64{1, 2}})
 	}
 	got := foldOthers(series)
-	if len(got) != maxSeries || got[3].Name != "otros" || got[3].Total != 47+46 || got[3].Values[1] != 4 {
+	if len(got) != maxSeries || got[3].Name != "others" || got[3].Total != 47+46 || got[3].Values[1] != 4 {
 		t.Errorf("foldOthers = %+v", got)
 	}
 	if got := foldOthers(series[:2]); len(got) != 2 {
@@ -153,7 +153,7 @@ func TestFoldOthers(t *testing.T) {
 }
 
 func TestHumanTokens(t *testing.T) {
-	for n, want := range map[int64]string{950: "950", 464_312: "464 k", 1_812_000: "1,8 M"} {
+	for n, want := range map[int64]string{950: "950", 464_312: "464 k", 1_812_000: "1.8 M"} {
 		if got := HumanTokens(n); got != want {
 			t.Errorf("HumanTokens(%d) = %q, want %q", n, got, want)
 		}

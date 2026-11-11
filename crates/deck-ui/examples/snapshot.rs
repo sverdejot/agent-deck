@@ -25,18 +25,18 @@ const OVERVIEW_GAP: usize = 24;
 type Sample<'a> = (&'a str, &'a str, &'a str, &'a str, i32);
 
 const SESSIONS: [Sample; 12] = [
-    ("busy", "Detección de Seeedstudio SenseCap Indicator", "esp", "", 30),
-    ("ready", "Migración de Authentik a Pocket ID", "homelab", "ahora", 85),
-    ("wait", "Glance como PWA sin icono", "homelab", "hace 10 min", 12),
-    ("idle", "Revisión de sesiones pendientes", "repos", "hace 19 h", -1),
-    ("idle", "Fallo de DNS en home.lab", "homelab", "hace 11 h", 40),
-    ("busy", "Optimización de RAM en cluster", "homelab", "", 64),
-    ("ready", "Tests de la paginación del grid", "agent-deck", "hace 2 min", 47),
-    ("idle", "Backup de Postgres a S3", "homelab", "hace 2 d", 22),
-    ("busy", "Refactor del parser de protocolo", "agent-deck", "", 58),
-    ("idle", "Notas de la charla de Rust", "notes", "hace 3 d", -1),
-    ("wait", "Permisos de escritura en /srv", "homelab", "hace 1 min", 33),
-    ("idle", "Actualizar dotfiles a zsh 5.9", "dotfiles", "hace 6 h", 15),
+    ("busy", "Detect the Seeedstudio SenseCap Indicator", "esp", "", 30),
+    ("ready", "Migrate Authentik to Pocket ID", "homelab", "now", 85),
+    ("wait", "Glance PWA has no icon", "homelab", "10 min ago", 12),
+    ("idle", "Review pending sessions", "repos", "19 h ago", -1),
+    ("idle", "DNS failure on home.lab", "homelab", "11 h ago", 40),
+    ("busy", "Cut RAM use in the cluster", "homelab", "", 64),
+    ("ready", "Tests for grid paging", "agent-deck", "2 min ago", 47),
+    ("idle", "Back up Postgres to S3", "homelab", "2 d ago", 22),
+    ("busy", "Refactor the protocol parser", "agent-deck", "", 58),
+    ("idle", "Notes for the Rust talk", "notes", "3 d ago", -1),
+    ("wait", "Write permissions on /srv", "homelab", "1 min ago", 33),
+    ("idle", "Update dotfiles to zsh 5.9", "dotfiles", "6 h ago", 15),
 ];
 
 /// Subagents running per session, for the `*-agents` snapshots: busy tiles with several, a
@@ -50,11 +50,11 @@ fn state(sessions: &[Sample], agents: &[u32]) -> State {
         writeln!(snap, "S\tcli:{i}\tcode\t{st}\t{title}\t{place}\t{age}\t{ctx}\t{n}").unwrap();
     }
     snap += "E\n";
-    snap += "L\t64\treinicia 16:40\t90\t52\treinicia vie 22:00\t39\tA este ritmo: 100% a las 16:10\tahora\n";
-    snap += "C\tB\nC\tH\t32\t36\t1,8 M\ttokens hoy · homelab el que más\n";
+    snap += "L\t64\tresets 16:40\t90\t52\tresets Fri 22:00\t39\tAt this pace: 100% at 16:10\tnow\n";
+    snap += "C\tB\nC\tH\t32\t36\t1.8 M\ttokens today · top: homelab\n";
     let bars = |k: u32| (0..36).map(|i| ((i * 37 + k * 11) % 90).to_string()).collect::<Vec<_>>().join(",");
-    writeln!(snap, "C\tS\thomelab\t1,3 M\t{}\nC\tS\tesp\t464 k\t{}", bars(1), bars(2)).unwrap();
-    snap += "C\tD\tM,M,J,V,S,D,L\t259,390,71,2585,2325,1776,1800\t6\nC\tE\n";
+    writeln!(snap, "C\tS\thomelab\t1.3 M\t{}\nC\tS\tesp\t464 k\t{}", bars(1), bars(2)).unwrap();
+    snap += "C\tD\tT,W,T,F,S,S,M\t259,390,71,2585,2325,1776,1800\t6\nC\tE\n";
     let mut s = State::default();
     s.feed(snap.as_bytes(), NOW);
     s
@@ -160,12 +160,12 @@ fn main() {
     st.summary = Some(Summary {
         id: "cli:0".into(),
         loaded: true,
-        meta: "esp · main · 30% del contexto".into(),
-        you: "El panel se queda en negro al arrancar, ¿puedes averiguar por qué?".into(),
-        claude: "El reset del panel va por el expansor de E/S y lo estaba soltando antes de configurar el \
-                 bus SPI. Muevo la inicialización del expansor al principio y pruebo de nuevo."
+        meta: "esp · main · 30% of context".into(),
+        you: "The panel stays black on boot, can you find out why?".into(),
+        claude: "The panel reset goes through the I/O expander, and I was releasing it before setting up \
+                 the SPI bus. I'll move the expander init to the start and try again."
             .into(),
-        tool: "Editando firmware/src/display.rs".into(),
+        tool: "Editing firmware/src/display.rs".into(),
         agents: Vec::new(),
     });
     let mut ui = Ui::new();
@@ -175,8 +175,8 @@ fn main() {
     // holding a session that waits on Claude's question: the options, ready to tap
     let mut st = state(&SESSIONS[..4], &[]);
     st.summary = Some(Summary { id: "cli:2".into(), loaded: true, ..Default::default() });
-    let question = "Q\tcli:2\t¿Dónde guardo los iconos de la PWA?\t1.En /static, servidos por Glance\t\
-                    2.En un bucket de S3 con su propia caché\t3.Generarlos en el build\n";
+    let question = "Q\tcli:2\tWhere should the PWA icons go?\t1.In /static, served by Glance\t\
+                    2.In an S3 bucket with its own cache\t3.Generate them at build time\n";
     st.feed(question.as_bytes(), NOW);
     let mut ui = Ui::new();
     ui.layout(&st);
@@ -193,16 +193,16 @@ fn main() {
     st.summary = Some(Summary {
         id: "cli:0".into(),
         loaded: true,
-        meta: "Empezó hace 2 h · 14 mensajes · esp · activa ahora".into(),
-        you: "Revisa por qué el panel parpadea al cambiar de pantalla y propón un arreglo.".into(),
-        claude: "Lanzo tres subagentes: uno busca dónde se redibuja, otro mide el tiempo de cada banda y otro \
-                 revisa la inicialización del bus."
+        meta: "Started 2 h ago · 14 messages · esp · active now".into(),
+        you: "Find out why the panel flickers when switching screens and suggest a fix.".into(),
+        claude: "Starting three subagents: one looks for where it redraws, one times each band and one \
+                 checks the bus init."
             .into(),
-        tool: "Agent: Buscar usos de tile_rect".into(),
+        tool: "Agent: Find uses of tile_rect".into(),
         agents: vec![
-            agent("Explore", "Buscar usos de tile_rect", "3 min", "Grep: tile_rect"),
-            agent("general-purpose", "Medir el tiempo de dibujo por banda", "2 min", "Bash: cargo test --release"),
-            agent("Plan", "Revisar la inicialización del bus SPI", "40 s", ""),
+            agent("Explore", "Find uses of tile_rect", "3 min", "Grep: tile_rect"),
+            agent("general-purpose", "Time the drawing of each band", "2 min", "Bash: cargo test --release"),
+            agent("Plan", "Check the SPI bus init", "40 s", ""),
         ],
     });
     let mut ui = Ui::new();
