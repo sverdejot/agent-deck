@@ -175,7 +175,7 @@ fn marks_width(n: u32) -> f32 {
 /// the top of the header text.
 fn draw_marks(c: &mut Canvas, n: u32, right: f32, y: f32, col: Rgb) {
     let x = right - marks_width(n);
-    let top = y + (fonts::TAG.ascent as f32 - MARK) / 2.0;
+    let top = (y + (fonts::TAG.ascent as f32 - MARK) / 2.0).round(); // whole pixels: crisp squares
     if n <= MARKS {
         for k in 0..n {
             c.round_rect(x + k as f32 * (MARK + MARK_GAP), top, MARK, MARK, 0.0, col, 1.0);
