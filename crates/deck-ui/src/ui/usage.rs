@@ -8,11 +8,11 @@ use crate::protocol::State;
 use crate::text::fit;
 
 pub(super) fn draw(c: &mut Canvas, st: &State) {
+    c.text(&fonts::TAG, "USAGE TODAY", 24, 22, FAINT, 2, 1.0);
     let Some(u) = &st.usage else {
         draw_centered(c, "Calculating usage…", None);
         return;
     };
-    c.text(&fonts::TAG, "USAGE TODAY", 24, 22, FAINT, 2, 1.0);
     c.text(&fonts::BIG, &u.total, 24, 44, TEXT, 0, 1.0);
     c.text(&fonts::SUB, &u.subtitle, 24, 96, MUTED, 0, 1.0);
 
@@ -63,6 +63,7 @@ pub(super) fn draw(c: &mut Canvas, st: &State) {
         let x = 24.0 + d as f32 * dslot;
         let today = d == u.today;
         c.round_rect(x + 6.0, 446.0 - h, dslot - 12.0, h, 0.0, if today { ORANGE } else { GREY_HI }, 1.0);
-        c.text(&fonts::TAG, label, (x + dslot / 2.0 - 4.0) as i32, 452, if today { TEXT } else { FAINT }, 0, 1.0);
+        let lx = (x + (dslot - fonts::TAG.width(label, 0) as f32) / 2.0) as i32;
+        c.text(&fonts::TAG, label, lx, 452, if today { TEXT } else { FAINT }, 0, 1.0);
     }
 }

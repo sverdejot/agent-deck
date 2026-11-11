@@ -161,8 +161,8 @@ impl Ui {
         }
         for (i, s) in Screen::ALL.iter().enumerate() {
             let on = *s == self.screen;
-            let x = W as f32 / 2.0 + (i as f32 - 1.0) * 14.0;
-            c.disc(x, y + 48.0, 3.0, if on { TEXT } else { MUTED }, if on { a } else { 0.5 * a });
+            let x = (W as f32 / 2.0 + (i as f32 - 1.0) * 14.0).round();
+            c.round_rect(x - 3.0, y + 45.0, 6.0, 6.0, 0.0, if on { TEXT } else { MUTED }, if on { a } else { 0.5 * a });
         }
     }
 

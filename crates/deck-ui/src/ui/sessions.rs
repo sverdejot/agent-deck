@@ -41,11 +41,12 @@ impl Ui {
             self.draw_page(c, st, self.page as isize + 1, self.page_x + W as f32, now);
         }
         let pc = grid::page_count(st.sessions.len());
+        // page marks: small squares, like every other marker on the deck
         for p in (0..pc).filter(|_| pc > 1) {
             let on = p == self.page;
-            let x = W as f32 / 2.0 + (p as f32 - (pc - 1) as f32 / 2.0) * 18.0;
-            let (r, col, a) = if on { (4.5, TEXT, 1.0) } else { (3.5, MUTED, 0.6) };
-            c.disc(x, H as f32 - 11.0, r, col, a);
+            let x = (W as f32 / 2.0 + (p as f32 - (pc - 1) as f32 / 2.0) * 18.0).round();
+            let (side, col, a) = if on { (8.0, TEXT, 1.0) } else { (6.0, MUTED, 0.6) };
+            c.round_rect(x - side / 2.0, H as f32 - 11.0 - side / 2.0, side, side, 0.0, col, a);
         }
     }
 

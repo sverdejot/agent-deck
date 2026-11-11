@@ -30,11 +30,11 @@ fn draw_block(c: &mut Canvas, y: i32, label: &str, pct: i32, reset: &str, elapse
 
 pub(super) fn draw(c: &mut Canvas, st: &State) {
     let l = &st.limits;
+    c.text(&fonts::TAG, "LIMITS", 24, 22, FAINT, 2, 1.0);
     if l.five < 0 {
         draw_centered(c, "No limits data yet", Some("It comes from Claude Code's statusline"));
         return;
     }
-    c.text(&fonts::TAG, "LIMITS", 24, 22, FAINT, 2, 1.0);
     if !l.updated.is_empty() {
         let s = format!("updated {}", l.updated);
         c.text(&fonts::SUB, &s, W - 24 - fonts::SUB.width(&s, 0), 20, FAINT, 0, 1.0);
