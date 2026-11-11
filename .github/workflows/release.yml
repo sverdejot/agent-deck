@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions: {}
@@ -10,7 +12,7 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# On every push to main, semantic-release (.github/release/package.json) reads the Conventional Commits since the
+# Once CI passes on a push to main, semantic-release (.github/release/package.json) reads the Conventional Commits since the
 # last vX.Y.Z tag and, if any is releasable (feat, fix, perf, breaking), tags the next version and
 # publishes the GitHub Release with the changelog as its notes. The jobs below attach the Mac
 # binaries, the merged firmware image and checksums.txt, and publish the web flasher (docs/flasher)
@@ -19,6 +21,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -29,6 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha }} # the commit CI tested
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
