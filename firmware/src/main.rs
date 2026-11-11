@@ -7,6 +7,7 @@
 
 mod board;
 mod render;
+mod splash;
 
 use anyhow::Result;
 use deck_ui::protocol::{State, HELLO};
@@ -59,10 +60,14 @@ fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
+    let splash = splash::load(); // before the panel starts: flash reads stall the cache
     let mut board = Board::new()?;
     let mut renderer = Renderer::new()?;
     let mut st = State::default();
     let mut ui = Ui::new();
+    if let Some(s) = splash {
+        ui.set_splash(s);
+    }
     let mut button = Button::default();
 
     let mut serial = [0u8; 512];

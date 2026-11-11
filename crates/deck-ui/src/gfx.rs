@@ -151,6 +151,18 @@ impl<'a> Canvas<'a> {
         unsafe { self.buf.get_unchecked_mut(start..start + W as usize) }
     }
 
+    /// Draws a picture of palette indices, `W` wide, from the top of the screen down to as many
+    /// rows as `pix` holds.
+    pub fn indexed(&mut self, pix: &[u8], palette: &[u16; 256]) {
+        let rows = (pix.len() / W as usize) as i32;
+        for y in self.clip_y0..self.clip_y1.min(rows) {
+            let src = &pix[(y * W) as usize..((y + 1) * W) as usize];
+            for (d, &i) in self.row(y).iter_mut().zip(src) {
+                *d = palette[i as usize];
+            }
+        }
+    }
+
     pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, c: u16) {
         let (x0, x1) = (x.max(0), (x + w).min(W));
         if x0 >= x1 {

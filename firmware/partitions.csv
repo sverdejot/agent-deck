@@ -1,0 +1,11 @@
+# Flash layout of the SenseCAP Indicator D1 (8 MB). espflash writes this table (see
+# .cargo/config.toml and the release workflow); ESP-IDF's own table setting is not used.
+#
+# splash: the custom start screen written from the web flasher (docs/splash.md). It sits past the
+# app, so flashing a new firmware leaves it in place.
+#
+# Name,    Type, SubType,   Offset,   Size
+nvs,       data, nvs,       0x9000,   0x6000
+phy_init,  data, phy,       0xf000,   0x1000
+factory,   app,  factory,   0x10000,  0x3F0000
+splash,    data, undefined, 0x400000, 0x400000

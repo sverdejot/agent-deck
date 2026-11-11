@@ -3,8 +3,9 @@ target = "xtensa-esp32s3-espidf"
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
-# UploadSpeed 115200: the Indicator's CH340 drops data at higher baud rates
-runner = "espflash flash --baud 115200"
+# UploadSpeed 115200: the Indicator's CH340 drops data at higher baud rates.
+# partitions.csv leaves room after the app for the custom start screen (docs/splash.md).
+runner = "espflash flash --baud 115200 --partition-table partitions.csv"
 rustflags = ["--cfg", "espidf_time64"]
 
 [unstable]

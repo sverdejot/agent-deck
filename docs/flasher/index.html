@@ -6,6 +6,10 @@
   <title>Agent Deck flasher</title>
   <meta name="description" content="Flash the Agent Deck firmware onto a SenseCAP Indicator D1 from the browser.">
   <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+  <script type="module" src="start-screen.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
@@ -49,6 +53,37 @@
     }
     .note { color: var(--muted); font-size: 0.9rem; }
     [slot] { color: #f0b429; }
+    h2 { margin: 36px 0 6px; font-size: 1.25rem; }
+
+    /* start screen */
+    [hidden] { display: none !important; }
+    .stage { position: relative; aspect-ratio: 1; width: 100%; max-width: 480px; margin: 0 auto 16px; }
+    #ss-preview {
+      width: 100%; height: 100%; display: block; border-radius: 8px; background: #000;
+      touch-action: none; cursor: grab;
+    }
+    #ss-preview:active { cursor: grabbing; }
+    #ss-drop {
+      position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+      border: 2px dashed var(--line); border-radius: 8px; color: var(--muted); padding: 24px;
+      background: var(--card);
+    }
+    #ss-drop.over { border-color: var(--accent); color: var(--fg); }
+    .row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 10px 0; }
+    .row label { display: inline-flex; gap: 8px; align-items: center; }
+    input[type=range] { width: 140px; accent-color: var(--accent); }
+    input[type=color] { width: 36px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+    select, button, .file {
+      font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 12px; cursor: pointer;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:disabled, select:disabled, input:disabled { opacity: 0.45; cursor: default; }
+    .file input { display: none; }
+    #ss-stats { color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+    .bad { color: #f0b429 !important; }
+    #ss-status { min-height: 1.55em; margin: 10px 0 0; }
+    progress { width: 100%; accent-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -82,6 +117,52 @@
       replaces whatever the ESP32-S3 had. Prefer the command line?
       <code>espflash write-bin 0x0 agent-deck-firmware_*_esp32s3.bin</code> with the file from the
       <a href="https://github.com/sverdejot/agent-deck/releases/latest">latest release</a>.
+    </p>
+
+    <h2>Start screen</h2>
+    <p>
+      Put your own picture or animation on the screen the deck shows while your Mac isn't connected:
+      a GIF, animated WebP or PNG, or a still PNG or JPEG. Fit it here, then write it to the deck.
+      It stays there when you update the firmware.
+    </p>
+    <div class="card" id="ss-card">
+      <div class="stage">
+        <canvas id="ss-preview" width="480" height="480" aria-label="Preview of the deck's start screen"></canvas>
+        <label id="ss-drop" for="ss-file">Drop an image here, or click to choose one<br>
+          GIF · WebP · PNG · JPEG</label>
+      </div>
+      <div id="ss-controls" hidden>
+        <div class="row">
+          <label>Zoom <input id="ss-zoom" type="range" min="25" max="400" value="80" step="5">
+            <span id="ss-zoom-out">80%</span></label>
+          <button id="ss-center" type="button">Center</button>
+        </div>
+        <div class="row">
+          <label>Background <input id="ss-bg" type="color" value="#000000"></label>
+          <label>Colours <select id="ss-colors">
+            <option>256</option><option>128</option><option selected>64</option>
+            <option>32</option><option>16</option><option>8</option>
+          </select></label>
+          <label class="file">Another image…<input id="ss-file" type="file"
+            accept="image/gif,image/webp,image/png,image/apng,image/jpeg"></label>
+        </div>
+        <p class="note">The picture and the deck's hint below it are laid out together; drag the
+          preview to move them, zoom to resize the picture. Fewer colours make the file smaller and
+          quicker to write.</p>
+        <p id="ss-stats"></p>
+      </div>
+      <div class="row">
+        <button id="ss-write" class="primary" type="button" disabled>Write to deck</button>
+        <button id="ss-download" type="button" disabled>Download .bin</button>
+        <button id="ss-reset" type="button">Restore default</button>
+      </div>
+      <progress id="ss-progress" value="0" hidden></progress>
+      <p id="ss-status" role="status"></p>
+    </div>
+    <p class="note">
+      Quit <code>agent-deck</code> on your Mac first: it holds the serial port. Needs firmware
+      v__VERSION__ or later. From the command line:
+      <code>espflash write-bin 0x400000 agent-deck-start-screen.bin</code>.
     </p>
   </main>
 </body>

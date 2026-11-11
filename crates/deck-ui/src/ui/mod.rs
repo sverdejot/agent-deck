@@ -17,6 +17,7 @@ mod usage;
 
 use crate::gfx::{fonts, Canvas, H, W};
 use crate::protocol::{answer_msg, open_msg, summary_msg, Session, State, Summary};
+use crate::splash::Splash;
 use theme::{BG, MUTED, TEXT};
 
 const HOLD_MS: u32 = 600;
@@ -74,6 +75,8 @@ pub struct Ui {
     tiles: Vec<sessions::TileText>,
     /// set when the sessions changed: [`Ui::layout`] must run before the next draw
     pub layout_dirty: bool,
+    /// custom start screen, shown instead of the orange one while there is no link
+    splash: Option<Splash>,
 }
 
 impl Default for Ui {
@@ -96,6 +99,7 @@ impl Default for Ui {
             summary_opened_ms: 0,
             tiles: Vec::new(),
             layout_dirty: true,
+            splash: None,
         }
     }
 }
@@ -105,12 +109,17 @@ impl Ui {
         Self::default()
     }
 
+    /// Uses `s` as the start screen (shown while there is no link to the Mac).
+    pub fn set_splash(&mut self, s: Splash) {
+        self.splash = Some(s);
+    }
+
     // ---- drawing ------------------------------------------------------------------------------
 
     /// Draws the current screen into `c` (called once per band).
     pub fn draw(&self, c: &mut Canvas, st: &State, now: u32) {
         if !st.linked(now) {
-            offline::draw(c, st.ever_linked);
+            offline::draw(c, st.ever_linked, self.splash.as_ref());
             return;
         }
         c.fill_rect(0, 0, W, H, BG.pack());
@@ -174,6 +183,11 @@ impl Ui {
     /// Per-frame motion (page settling, summary timeout). Returns true if something changed.
     pub fn tick(&mut self, st: &mut State, now: u32) -> bool {
         let mut changed = false;
+        if !st.linked(now) {
+            if let Some(s) = &mut self.splash {
+                changed |= s.tick(now);
+            }
+        }
         if !self.touching && self.page_x != 0.0 {
             self.page_x *= 0.72;
             if self.page_x.abs() < 0.5 {

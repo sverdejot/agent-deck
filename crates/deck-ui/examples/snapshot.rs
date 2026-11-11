@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 
 use deck_ui::gfx::{Canvas, H, W};
 use deck_ui::protocol::{State, Subagent, Summary};
+use deck_ui::splash::Splash;
 use deck_ui::ui::Ui;
 
 const NOW: u32 = 10_000;
@@ -223,4 +224,21 @@ fn main() {
 
     let six = six.expect("6-session snapshot");
     save(&overview(&[&six, &limits, &usage, &offline]), "overview");
+
+    // DECK_SPLASH=file.bin: the start screen with that splash, at the frames listed in
+    // DECK_SPLASH_FRAMES (default 0), as splash-<frame>.png
+    if let Ok(path) = std::env::var("DECK_SPLASH") {
+        let data = std::fs::read(&path).expect("DECK_SPLASH file");
+        let wanted = std::env::var("DECK_SPLASH_FRAMES").unwrap_or_else(|_| "0".into());
+        for k in wanted.split(',').map(|k| k.trim().parse::<usize>().expect("frame number")) {
+            let mut splash = Splash::parse(data.clone()).expect("valid splash");
+            splash.tick(0);
+            for step in 1..=k {
+                splash.tick(step as u32 * 70_000); // longer than any frame: one frame per tick
+            }
+            let mut ui = Ui::new();
+            ui.set_splash(splash);
+            save(&render(&ui, &State::default()), &format!("splash-{k}"));
+        }
+    }
 }

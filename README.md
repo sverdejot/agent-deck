@@ -33,6 +33,10 @@ screen.
 **[sverdejot.github.io/agent-deck](https://sverdejot.github.io/agent-deck/)**, picking the
 CH340 serial port. Or build it yourself: `mise run fw:flash`.
 
+**Start screen** (optional) — the same page turns a GIF, animated WebP/PNG, PNG or JPEG into the
+screen the deck shows while the Mac isn't connected, and writes it. It survives firmware updates.
+Format: [docs/splash.md](docs/splash.md).
+
 **Mac agent**:
 
 ```sh
@@ -52,6 +56,8 @@ firmware/         ESP32-S3 firmware (Rust, esp-idf)
 crates/deck-ui/   screens, layout and protocol (Rust, runs and tests on the host)
 host/             Mac agent (Go)
 docs/protocol.md  serial protocol
+docs/splash.md    start screen format
+docs/flasher/     web flasher and start screen editor (GitHub Pages)
 ```
 
 Requires [mise](https://mise.jdx.dev) and rustup; every tool version is pinned.
