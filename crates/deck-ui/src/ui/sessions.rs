@@ -75,7 +75,12 @@ impl Ui {
     }
 
     fn draw_tile(&self, c: &mut Canvas, s: &Session, t: &TileText, i: usize, r: Rect, now: u32) {
-        if r.y >= c.clip_y1 as f32 || r.y + r.h <= c.clip_y0 as f32 || r.x >= W as f32 || r.x + r.w <= 0.0 {
+        let m = PULSE; // a waiting tile's border reaches out this far
+        if r.y - m >= c.clip_y1 as f32
+            || r.y + r.h + m <= c.clip_y0 as f32
+            || r.x - m >= W as f32
+            || r.x + r.w + m <= 0.0
+        {
             return;
         }
         let busy = s.busy();
@@ -86,24 +91,18 @@ impl Ui {
         if busy {
             c.round_rect(r.x, r.y, r.w, r.h, 0.0, if pressed { ORANGE_HI } else { ORANGE }, 1.0);
         } else {
-            let (mut bw, mut alpha) = (2.0, 1.0);
+            // the pulse of a waiting tile grows outwards into the gap: the inside never moves
+            let (mut grow, mut alpha) = (0.0, 1.0);
             if s.waiting() {
                 let p = 0.5 + 0.5 * (now as f32 / 260.0).sin();
-                bw = 2.0 + 3.0 * p;
+                grow = (PULSE * p).round();
                 alpha = 0.6 + 0.4 * p;
             } else if s.state != "ready" {
                 alpha = 0.35; // idle
             }
-            c.frame(r.x, r.y, r.w, r.h, bw, BG.mix(ORANGE, alpha));
-            c.round_rect(
-                r.x + bw,
-                r.y + bw,
-                r.w - 2.0 * bw,
-                r.h - 2.0 * bw,
-                0.0,
-                if pressed { GREY_HI } else { GREY },
-                1.0,
-            );
+            c.frame(r.x - grow, r.y - grow, r.w + 2.0 * grow, r.h + 2.0 * grow, BORDER + grow, BG.mix(ORANGE, alpha));
+            let inside = if pressed { GREY_HI } else { GREY };
+            c.round_rect(r.x + BORDER, r.y + BORDER, r.w - 2.0 * BORDER, r.h - 2.0 * BORDER, 0.0, inside, 1.0);
         }
         if flash > 0.0 {
             c.round_rect(r.x, r.y, r.w, r.h, 0.0, WHITE, flash * 0.45);
@@ -132,7 +131,7 @@ impl Ui {
 
         // context window used: thin bar along the bottom edge
         if s.ctx >= 0 {
-            let inset = if busy { 0.0 } else { 2.0 };
+            let inset = if busy { 0.0 } else { BORDER };
             let (bw, by) = (r.w - 2.0 * inset, r.y + r.h - inset - 4.0);
             let track = if busy { ORANGE_DEEP } else { rgb(58, 57, 54) };
             let fill = if busy {
@@ -147,6 +146,11 @@ impl Ui {
         }
     }
 }
+
+/// Border of a tile that isn't working (a waiting one pulses outwards from it).
+const BORDER: f32 = 2.0;
+/// How far out the border of a waiting tile pulses (half the gap between tiles).
+const PULSE: f32 = 3.0;
 
 /// Squares drawn for the subagents of a tile; beyond this the count is written next to one.
 const MARKS: u32 = 4;
