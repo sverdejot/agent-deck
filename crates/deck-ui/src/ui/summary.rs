@@ -2,28 +2,33 @@
 //! running, your last message and Claude's last reply, and a button to open it. When Claude is
 //! waiting on a menu (a question, a permission, a plan approval) the summary shows the question and
 //! one button per option instead.
+//!
+//! Same visual language as the rest of the deck: a tracked label row at the top (as on Limits and
+//! Usage), grey section labels, square flat rows for every button, orange only for state and
+//! markers, and pressed = lighter grey.
 
 use super::draw_centered;
 use super::grid::Rect;
-use super::theme::{FAINT, GREY, MUTED, ON_ORANGE, ORANGE, TEXT};
-use crate::gfx::{fonts, Canvas, Rgb, H, W};
+use super::theme::{FAINT, GREY, GREY_HI, MUTED, ORANGE, TEXT};
+use crate::gfx::{fonts, Canvas, H, W};
 use crate::protocol::{Question, Session, State, Subagent, Summary};
 use crate::text::{fit, wrap};
 
-/// Taps below this line hit the "Open session" button.
-pub const OPEN_BUTTON_Y: i32 = H - 80;
+const MARGIN: f32 = 24.0;
+/// "Open session": a flat square row along the bottom, the same with or without a question.
+const OPEN_H: f32 = 48.0;
+const OPEN_TOP: f32 = H as f32 - MARGIN - OPEN_H;
+/// Taps below this line hit the "Open session" button (a little slop above it).
+pub const OPEN_BUTTON_Y: i32 = OPEN_TOP as i32 - 4;
 /// Rows of the SUBAGENTS block, "+n more" included.
 const AGENT_ROWS: usize = 4;
-
-/// With a question, "Open session" becomes a quiet text link at the very bottom.
-const Q_OPEN_CY: f32 = H as f32 - 28.0;
-/// Taps below this line hit "Open session" when a question is on screen.
-pub const Q_OPEN_BUTTON_Y: i32 = H - 54;
-/// Option rows: flat and square like the tiles, finger-sized, stacked up from above the link.
-const OPTION_H: f32 = 60.0;
+/// Option rows: flat and square like the tiles, finger-sized, stacked up from above the button.
+const OPTION_H: f32 = 56.0;
 const OPTION_GAP: f32 = 6.0;
-const OPTIONS_BOTTOM: f32 = (H - 62) as f32;
-const MARGIN: f32 = 24.0;
+const OPTIONS_BOTTOM: f32 = OPEN_TOP - 8.0;
+/// Header row (state label and context), then the heading under it.
+const HEADER_Y: i32 = 22;
+const HEADING_Y: i32 = 54;
 
 /// Button of option `k` of `n`: one column up to 4 options, two columns beyond.
 pub(super) fn option_rect(n: usize, k: usize) -> Rect {
@@ -45,20 +50,31 @@ pub(super) fn option_at(n: usize, x: i32, y: i32) -> Option<usize> {
     (0..n).find(|&k| option_rect(n, k).contains(x, y))
 }
 
-/// `pressed`: index of the option under the finger, highlighted.
-pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<usize>) {
+/// What the finger is on in the summary, highlighted while it stays there.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Pressed {
+    Option(usize),
+    Open,
+}
+
+pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<Pressed>) {
     let Some(s) = st.sessions.iter().find(|s| s.id == sum.id) else {
         draw_centered(c, "This session is gone", None);
         return;
     };
+    let open_pressed = pressed == Some(Pressed::Open);
     if let Some(q) = st.question_for(&sum.id) {
-        draw_question(c, s, q, pressed);
+        let option = match pressed {
+            Some(Pressed::Option(k)) => Some(k),
+            _ => None,
+        };
+        draw_question(c, s, q, option);
+        open_button(c, open_pressed);
         return;
     }
-    let (x, w) = (24, W - 48);
-    let mut y = 22;
-    pill(c, s, x, y);
-    y += 44;
+    let (x, w) = (MARGIN as i32, W - 2 * MARGIN as i32);
+    header(c, s, &s.age); // the repo is already in the meta line
+    let mut y = HEADING_Y;
 
     let head = wrap(&fonts::HEAD, &s.title, w, 2);
     for (l, line) in head.iter().enumerate() {
@@ -72,12 +88,12 @@ pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<us
             c.text(&fonts::SUB, &fit(&fonts::SUB, &sum.meta, w), x, y, MUTED, 0, 1.0);
             y += lh + 10;
         }
-        let bottom_limit = H - 84;
-        let block = |c: &mut Canvas, y: &mut i32, label: &str, col: Rgb, text: &str, max_lines: usize| {
+        let bottom_limit = OPEN_TOP as i32 - 12;
+        let block = |c: &mut Canvas, y: &mut i32, label: &str, text: &str, max_lines: usize| {
             if text.is_empty() || *y + lh * 2 > bottom_limit {
                 return;
             }
-            c.text(&fonts::TAG, label, x, *y, col, 1, 1.0);
+            c.text(&fonts::TAG, label, x, *y, FAINT, 2, 1.0);
             *y += 20;
             let room = usize::try_from((bottom_limit - *y) / lh).unwrap_or(0);
             let lines = wrap(&fonts::SUB, text, w, max_lines.min(room));
@@ -86,41 +102,43 @@ pub(super) fn draw(c: &mut Canvas, st: &State, sum: &Summary, pressed: Option<us
             }
             *y += lines.len() as i32 * lh + 12;
         };
-        block(c, &mut y, "NOW", ORANGE, &sum.tool, 2);
+        block(c, &mut y, "NOW", &sum.tool, 2);
         agents_block(c, &mut y, x, w, bottom_limit, &sum.agents);
-        block(c, &mut y, "YOU", MUTED, &sum.you, 3);
-        block(c, &mut y, "CLAUDE", ORANGE, &sum.claude, 6);
+        block(c, &mut y, "YOU", &sum.you, 3);
+        block(c, &mut y, "CLAUDE", &sum.claude, 6);
     } else {
         c.text(&fonts::SUB, "Loading…", x, y + 10, MUTED, 0, 1.0);
     }
-
-    c.round_rect(x as f32, (H - 72) as f32, w as f32, 52.0, 26.0, ORANGE, 1.0);
-    c.text_centered(&fonts::TITLE, "Open session", W as f32 / 2.0, (H - 46) as f32, ON_ORANGE, 1.0);
+    open_button(c, open_pressed);
 }
 
-/// State label in a rounded pill at (x, y); returns its width.
-fn pill(c: &mut Canvas, s: &Session, x: i32, y: i32) -> i32 {
-    let busy = s.busy();
-    let label = s.state_label();
-    let lw = fonts::SUB.width(label, 0) + 24;
-    c.round_rect(x as f32, y as f32, lw as f32, 30.0, 15.0, if busy { ORANGE } else { GREY }, 1.0);
-    c.text(&fonts::SUB, label, x + 12, y + 5, if busy { ON_ORANGE } else { TEXT }, 0, 1.0);
-    lw
+/// Header row, like Limits and Usage: the state as a tracked label (orange unless idle, as on
+/// the tiles) and `context` in grey on the right.
+fn header(c: &mut Canvas, s: &Session, context: &str) {
+    let (x, w) = (MARGIN as i32, W - 2 * MARGIN as i32);
+    let label = s.state_label().to_uppercase();
+    let col = if matches!(s.state.as_str(), "busy" | "wait" | "ready") { ORANGE } else { FAINT };
+    c.text(&fonts::TAG, &label, x, HEADER_Y, col, 2, 1.0);
+    let lw = fonts::TAG.width(&label, 2) + 16;
+    let context = fit(&fonts::SUB, context, w - lw);
+    c.text(&fonts::SUB, &context, x + w - fonts::SUB.width(&context, 0), HEADER_Y - 2, FAINT, 0, 1.0);
 }
 
-/// Claude is waiting on a menu. Laid out like the other screens: a tracked label with the session
-/// on the right, the question in the heading font, then one flat row per option and a quiet
-/// "Open session" link at the bottom.
+/// "Open session": a flat square row like the options, lighter under the finger.
+fn open_button(c: &mut Canvas, pressed: bool) {
+    let (x, w) = (MARGIN, W as f32 - 2.0 * MARGIN);
+    c.round_rect(x, OPEN_TOP, w, OPEN_H, 0.0, if pressed { GREY_HI } else { GREY }, 1.0);
+    c.text_centered(&fonts::TITLE, "Open session", W as f32 / 2.0, OPEN_TOP + OPEN_H / 2.0, TEXT, 1.0);
+}
+
+/// Claude is waiting on a menu: the header (with the session's title, shown nowhere else here),
+/// the question in the heading font, then one flat row per option above "Open session".
 fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usize>) {
     let (x, w) = (MARGIN as i32, W - 2 * MARGIN as i32);
-    let label = "NEEDS YOU";
-    c.text(&fonts::TAG, label, x, 22, ORANGE, 2, 1.0);
-    let lw = fonts::TAG.width(label, 2) + 16;
-    let title = fit(&fonts::SUB, &s.title, w - lw);
-    c.text(&fonts::SUB, &title, x + w - fonts::SUB.width(&title, 0), 20, FAINT, 0, 1.0);
+    header(c, s, &s.title);
 
     let n = q.options.len();
-    let y = 54;
+    let y = HEADING_Y;
     let options_top = option_rect(n, 0).y as i32;
     let lh = fonts::HEAD.line_height();
     let max_lines = usize::try_from((options_top - 16 - y) / lh).unwrap_or(0).max(1);
@@ -131,16 +149,14 @@ fn draw_question(c: &mut Canvas, s: &Session, q: &Question, pressed: Option<usiz
     for (k, (num, label)) in q.options.iter().enumerate() {
         option_row(c, option_rect(n, k), *num, label, pressed == Some(k));
     }
-
-    c.text_centered(&fonts::SUB, "Open session", W as f32 / 2.0, Q_OPEN_CY, MUTED, 1.0);
 }
 
 /// One option: a flat grey row (square, like an idle tile) with its number in orange and the label,
-/// always in the title font, on up to two lines. Pressed, it turns solid orange like a working tile.
+/// always in the title font, on up to two lines. Lighter under the finger, like a pressed tile.
 fn option_row(c: &mut Canvas, r: Rect, num: u8, label: &str, pressed: bool) {
-    c.round_rect(r.x, r.y, r.w, r.h, 0.0, if pressed { ORANGE } else { GREY }, 1.0);
-    let (fg, accent) = if pressed { (ON_ORANGE, ON_ORANGE) } else { (TEXT, ORANGE) };
-    c.text_centered(&fonts::TITLE, &num.to_string(), r.x + 22.0, r.y + r.h / 2.0, accent, 1.0);
+    c.round_rect(r.x, r.y, r.w, r.h, 0.0, if pressed { GREY_HI } else { GREY }, 1.0);
+    let fg = TEXT;
+    c.text_centered(&fonts::TITLE, &num.to_string(), r.x + 22.0, r.y + r.h / 2.0, ORANGE, 1.0);
 
     let tx = (r.x + 44.0) as i32;
     let tw = (r.w - 44.0 - 14.0) as i32;
@@ -163,7 +179,7 @@ fn agents_block(c: &mut Canvas, y: &mut i32, x: i32, w: i32, bottom: i32, agents
     if agents.is_empty() || *y + 20 + lh > bottom {
         return;
     }
-    c.text(&fonts::TAG, &format!("SUBAGENTS · {}", agents.len()), x, *y, ORANGE, 1, 1.0);
+    c.text(&fonts::TAG, &format!("SUBAGENTS · {}", agents.len()), x, *y, FAINT, 2, 1.0);
     *y += 20;
     let room = usize::try_from((bottom - *y) / lh).unwrap_or(0).clamp(1, AGENT_ROWS);
     let shown = if agents.len() > room { (room - 1).max(1) } else { agents.len() };

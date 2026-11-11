@@ -66,6 +66,8 @@ pub struct Ui {
     pressed: Option<usize>,
     /// option button of the summary's question under the finger
     pressed_option: Option<usize>,
+    /// the summary's "Open session" button under the finger
+    pressed_open: bool,
     flash_id: String,
     flash_ms: u32,
     toast_ms: Option<u32>,
@@ -92,6 +94,7 @@ impl Default for Ui {
             touch_start_ms: 0,
             pressed: None,
             pressed_option: None,
+            pressed_open: false,
             flash_id: String::new(),
             flash_ms: 0,
             toast_ms: None,
@@ -127,7 +130,7 @@ impl Ui {
             Screen::Limits => limits::draw(c, st),
             Screen::Usage => usage::draw(c, st),
             Screen::Sessions => match &st.summary {
-                Some(sum) => summary::draw(c, st, sum, self.pressed_option),
+                Some(sum) => summary::draw(c, st, sum, self.summary_pressed()),
                 None if st.sessions.is_empty() => {
                     draw_centered(c, "No open sessions", Some("Start Claude Code in a terminal"));
                 }
@@ -159,6 +162,13 @@ impl Ui {
             let x = W as f32 / 2.0 + (i as f32 - 1.0) * 14.0;
             c.disc(x, y + 48.0, 3.0, if on { TEXT } else { MUTED }, if on { a } else { 0.5 * a });
         }
+    }
+
+    fn summary_pressed(&self) -> Option<summary::Pressed> {
+        if self.pressed_open {
+            return Some(summary::Pressed::Open);
+        }
+        self.pressed_option.map(summary::Pressed::Option)
     }
 
     /// Needs another frame soon: something moves or pulses.
@@ -212,6 +222,7 @@ impl Ui {
         st.summary = None;
         self.pressed = None;
         self.pressed_option = None;
+        self.pressed_open = false;
         self.toast_ms = Some(now);
         self.toast_text = "";
     }
@@ -241,6 +252,10 @@ impl Ui {
                 self.touch_start_ms = now;
                 self.pressed = self.tile_at(st, x, y, now);
                 self.pressed_option = option_at(st, x, y, now);
+                self.pressed_open = self.pressed_option.is_none()
+                    && st.summary.is_some()
+                    && st.linked(now)
+                    && y >= summary::OPEN_BUTTON_Y;
                 (None, true)
             }
             (Some((x, y)), true) => self.finger_moved(st, x, y, now),
@@ -265,9 +280,10 @@ impl Ui {
             return (None, true);
         }
         let slid = (x - sx).abs() > SLOP_PX || (y - sy).abs() > SLOP_PX;
-        if !self.held && (self.pressed.is_some() || self.pressed_option.is_some()) && slid {
+        if !self.held && (self.pressed.is_some() || self.pressed_option.is_some() || self.pressed_open) && slid {
             self.pressed = None; // finger slid off: cancel the tap
             self.pressed_option = None;
+            self.pressed_open = false;
             return (None, true);
         }
         if let Some(i) = self.pressed.filter(|_| !self.held && now.wrapping_sub(self.touch_start_ms) > HOLD_MS) {
@@ -297,7 +313,6 @@ impl Ui {
             }
         } else if let Some(id) = st.summary.as_ref().filter(|_| !self.held).map(|s| s.id.clone()) {
             let q = st.question_for(&id);
-            let open_y = if q.is_some() { summary::Q_OPEN_BUTTON_Y } else { summary::OPEN_BUTTON_Y };
             let (tx, ty) = self.touch_start;
             // started on an option: answer it, or nothing if the finger slid off
             let on_option = q.and_then(|q| summary::option_at(q.options.len(), tx, ty)).is_some();
@@ -309,10 +324,10 @@ impl Ui {
                 self.summary_opened_ms = now;
                 self.toast_text = "Answer sent";
                 self.toast_ms = Some(now);
-            } else if !on_option && ty >= open_y {
+            } else if self.pressed_open {
                 msg = Some(self.open(&id, now));
                 st.summary = None;
-            } else if !on_option && now.wrapping_sub(self.summary_opened_ms) > 300 {
+            } else if !on_option && ty < summary::OPEN_BUTTON_Y && now.wrapping_sub(self.summary_opened_ms) > 300 {
                 st.summary = None;
             }
         } else if let Some(i) = self.pressed.filter(|_| !self.held) {
@@ -320,6 +335,7 @@ impl Ui {
         }
         self.pressed = None;
         self.pressed_option = None;
+        self.pressed_open = false;
         self.swiping = false;
         self.held = false;
         msg

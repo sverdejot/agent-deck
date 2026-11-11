@@ -2,7 +2,7 @@ mod common;
 
 use common::{pixel, render, render_banded, snapshot, state_with, NOW};
 use deck_ui::protocol::{State, Summary, LINK_TIMEOUT_MS};
-use deck_ui::ui::theme::{BG, GREY, ON_ORANGE, ORANGE};
+use deck_ui::ui::theme::{BG, GREY, GREY_HI, ON_ORANGE, ORANGE};
 use deck_ui::ui::{Screen, Ui};
 
 const SAMPLE: [(&str, &str, &str, &str, i32); 5] = [
@@ -193,4 +193,18 @@ fn open_button_still_works_with_a_question() {
     ui.touch(&mut st, Some((240, 450)), NOW + 2000);
     assert_eq!(ui.touch(&mut st, None, NOW + 2100).0.as_deref(), Some("O\tcli:2\n"));
     assert!(st.summary.is_none());
+}
+
+#[test]
+fn open_button_lights_up_under_the_finger() {
+    let (mut st, mut ui) = asking();
+    let idle = render(&ui, &st, NOW + 2000);
+    assert_eq!(pixel(&idle, 30, 412), GREY.pack());
+    ui.touch(&mut st, Some((240, 450)), NOW + 2000);
+    let pressed = render(&ui, &st, NOW + 2050);
+    assert_eq!(pixel(&pressed, 30, 412), GREY_HI.pack());
+    // sliding off cancels it: nothing is sent and the summary stays
+    ui.touch(&mut st, Some((240, 380)), NOW + 2080);
+    assert_eq!(ui.touch(&mut st, None, NOW + 2100).0, None);
+    assert!(st.summary.is_some());
 }
