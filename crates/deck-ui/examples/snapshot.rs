@@ -26,18 +26,18 @@ const OVERVIEW_GAP: usize = 24;
 type Sample<'a> = (&'a str, &'a str, &'a str, &'a str, i32);
 
 const SESSIONS: [Sample; 12] = [
-    ("busy", "Detect the Seeedstudio SenseCap Indicator", "esp", "", 30),
-    ("ready", "Migrate Authentik to Pocket ID", "homelab", "now", 85),
-    ("wait", "Glance PWA has no icon", "homelab", "10 min ago", 12),
-    ("idle", "Review pending sessions", "repos", "19 h ago", -1),
-    ("idle", "DNS failure on home.lab", "homelab", "11 h ago", 40),
-    ("busy", "Cut RAM use in the cluster", "homelab", "", 64),
-    ("ready", "Tests for grid paging", "agent-deck", "2 min ago", 47),
-    ("idle", "Back up Postgres to S3", "homelab", "2 d ago", 22),
-    ("busy", "Refactor the protocol parser", "agent-deck", "", 58),
-    ("idle", "Notes for the Rust talk", "notes", "3 d ago", -1),
-    ("wait", "Write permissions on /srv", "homelab", "1 min ago", 33),
-    ("idle", "Update dotfiles to zsh 5.9", "dotfiles", "6 h ago", 15),
+    ("busy", "Add Stripe webhooks to the checkout", "storefront", "", 30),
+    ("ready", "Move sign-in to OAuth 2.1", "billing-api", "now", 85),
+    ("wait", "Flaky login test on CI", "mobile-app", "10 min ago", 12),
+    ("idle", "Review open pull requests", "platform", "19 h ago", -1),
+    ("idle", "DNS failure on staging", "infra", "11 h ago", 40),
+    ("busy", "Cut the worker's memory use", "data-pipeline", "", 64),
+    ("ready", "Tests for invoice paging", "billing-api", "2 min ago", 47),
+    ("idle", "Back up Postgres to S3", "infra", "2 d ago", 22),
+    ("busy", "Refactor the CSV importer", "data-pipeline", "", 58),
+    ("idle", "Draft the release notes", "docs-site", "3 d ago", -1),
+    ("wait", "Write access to /var/app", "infra", "1 min ago", 33),
+    ("idle", "Upgrade React Native to 0.80", "mobile-app", "6 h ago", 15),
 ];
 
 /// Subagents running per session, for the `*-agents` snapshots: busy tiles with several, a
@@ -52,9 +52,9 @@ fn state(sessions: &[Sample], agents: &[u32]) -> State {
     }
     snap += "E\n";
     snap += "L\t64\tresets 16:40\t90\t52\tresets Fri 22:00\t39\tAt this pace: 100% at 16:10\tnow\n";
-    snap += "C\tB\nC\tH\t32\t36\t1.8 M\ttokens today · top: homelab\n";
+    snap += "C\tB\nC\tH\t32\t36\t1.8 M\ttokens today · top: storefront\n";
     let bars = |k: u32| (0..36).map(|i| ((i * 37 + k * 11) % 90).to_string()).collect::<Vec<_>>().join(",");
-    writeln!(snap, "C\tS\thomelab\t1.3 M\t{}\nC\tS\tesp\t464 k\t{}", bars(1), bars(2)).unwrap();
+    writeln!(snap, "C\tS\tstorefront\t1.3 M\t{}\nC\tS\tbilling-api\t464 k\t{}", bars(1), bars(2)).unwrap();
     snap += "C\tD\tT,W,T,F,S,S,M\t259,390,71,2585,2325,1776,1800\t6\nC\tE\n";
     let mut s = State::default();
     s.feed(snap.as_bytes(), NOW);
@@ -161,12 +161,12 @@ fn main() {
     st.summary = Some(Summary {
         id: "cli:0".into(),
         loaded: true,
-        meta: "esp · main · 30% of context".into(),
-        you: "The panel stays black on boot, can you find out why?".into(),
-        claude: "The panel reset goes through the I/O expander, and I was releasing it before setting up \
-                 the SPI bus. I'll move the expander init to the start and try again."
+        meta: "storefront · main · 30% of context".into(),
+        you: "Checkout hangs after paying with a saved card, can you find out why?".into(),
+        claude: "The webhook waits for an order that is only created after the redirect. I'll create the \
+                 order first and let the webhook mark it as paid."
             .into(),
-        tool: "Editing firmware/src/display.rs".into(),
+        tool: "Editing src/checkout/webhooks.ts".into(),
         agents: Vec::new(),
     });
     let mut ui = Ui::new();
@@ -176,8 +176,8 @@ fn main() {
     // holding a session that waits on Claude's question: the options, ready to tap
     let mut st = state(&SESSIONS[..4], &[]);
     st.summary = Some(Summary { id: "cli:2".into(), loaded: true, ..Default::default() });
-    let question = "Q\tcli:2\tWhere should the PWA icons go?\t1.In /static, served by Glance\t\
-                    2.In an S3 bucket with its own cache\t3.Generate them at build time\n";
+    let question = "Q\tcli:2\tHow should we fix the flaky login test?\t1.Wait for the network to go idle\t\
+                    2.Mock the auth server in tests\t3.Retry the test up to 3 times\n";
     st.feed(question.as_bytes(), NOW);
     let mut ui = Ui::new();
     ui.layout(&st);
@@ -194,16 +194,16 @@ fn main() {
     st.summary = Some(Summary {
         id: "cli:0".into(),
         loaded: true,
-        meta: "Started 2 h ago · 14 messages · esp · active now".into(),
-        you: "Find out why the panel flickers when switching screens and suggest a fix.".into(),
-        claude: "Starting three subagents: one looks for where it redraws, one times each band and one \
-                 checks the bus init."
+        meta: "Started 2 h ago · 14 messages · storefront · active now".into(),
+        you: "Find out why checkout is slow on mobile and suggest a fix.".into(),
+        claude: "Starting three subagents: one looks for slow API calls, one profiles the page load and one \
+                 reviews the bundle size."
             .into(),
-        tool: "Agent: Find uses of tile_rect".into(),
+        tool: "Agent: Find slow API calls".into(),
         agents: vec![
-            agent("Explore", "Find uses of tile_rect", "3 min", "Grep: tile_rect"),
-            agent("general-purpose", "Time the drawing of each band", "2 min", "Bash: cargo test --release"),
-            agent("Plan", "Check the SPI bus init", "40 s", ""),
+            agent("Explore", "Find slow API calls", "3 min", "Grep: fetch("),
+            agent("general-purpose", "Profile the checkout page load", "2 min", "Bash: npm run lighthouse"),
+            agent("Plan", "Review the JS bundle size", "40 s", ""),
         ],
     });
     let mut ui = Ui::new();
