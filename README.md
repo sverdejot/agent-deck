@@ -3,9 +3,9 @@
 [![CI](https://github.com/sverdejot/agent-deck/actions/workflows/ci.yml/badge.svg)](https://github.com/sverdejot/agent-deck/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-A desk display for [Claude Code](https://claude.com/claude-code): a SenseCAP Indicator D1 that
-shows the sessions running in your Mac's terminal, tells you which one needs you, and brings the
-one you tap to the front.
+A desk display for [Claude Code](https://claude.com/claude-code): a small touch screen that shows
+the sessions running in your terminal, tells you which one needs you, and brings the one you tap
+to the front.
 
 <p align="center"><img src="docs/images/overview.png" width="552" alt="Sessions, limits, usage and offline screens"></p>
 
@@ -13,7 +13,7 @@ one you tap to the front.
 
 | | |
 |---|---|
-| <img src="docs/images/sessions-6.png" width="240" alt="Sessions"> | **Sessions** — one tile per session; the grid adapts from 1 to 9 tiles (rows up to 3, then 2×2, 2×3 and 3×3, all tiles the same size), then pages. Orange = working, pulsing border = needs you, orange border = finished recently, faint = idle. Repo on top with a badge counting the subagents at work, context-window bar at the bottom. **Tap** to focus the session's tmux pane in Ghostty. |
+| <img src="docs/images/sessions-6.png" width="240" alt="Sessions"> | **Sessions** — one tile per session; the grid adapts from 1 to 9 tiles (rows up to 3, then 2×2, 2×3 and 3×3, all tiles the same size), then pages. Orange = working, pulsing border = needs you, orange border = finished recently, faint = idle. Repo on top with a badge counting the subagents at work, context-window bar at the bottom. **Tap** to bring the session's tmux pane to the front in your terminal. |
 | <img src="docs/images/summary.png" width="240" alt="Summary"> | **Summary** — hold a tile: what it is doing now, the subagents it has running (type, task, how long), your last message and Claude's last reply, read from the transcript. When Claude is waiting on you (a question, a permission, a plan approval) it shows the question with one button per option: **tap** one to answer without leaving what you're doing (tmux sessions). |
 | <img src="docs/images/limits.png" width="240" alt="Limits"> | **Limits** — 5-hour and weekly plan usage, when they reset, how much of each window has passed, and when you'd hit 100% at the current pace. |
 | <img src="docs/images/usage.png" width="240" alt="Usage"> | **Usage** — today's tokens in 15-minute bars per repo, and the last 7 days. |
@@ -23,15 +23,22 @@ screen.
 
 ## Requirements
 
-- [SenseCAP Indicator D1](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) (ESP32-S3 + 4" 480×480 touch screen), connected over USB.
-- macOS, with Claude Code running in **tmux** inside **Ghostty** (other terminals are not supported yet).
+- The deck: a 480×480 touch screen, connected over USB (see [Supported hardware](#supported-hardware)).
+- macOS, with Claude Code running in **tmux** inside a supported terminal.
 - A Claude subscription for the Limits screen (the data comes from Claude Code's statusline).
+
+### Supported hardware
+
+| | Supported today |
+|---|---|
+| Display | [SenseCAP Indicator D1](https://www.seeedstudio.com/SenseCAP-Indicator-D1-p-5643.html) (ESP32-S3, 4" 480×480 touch screen) |
+| Terminal | [Ghostty](https://ghostty.org) (answering questions from the deck works in any terminal running tmux) |
 
 ## Install
 
 **Firmware** — flash it from the browser (Chrome or Edge) at
 **[sverdejot.github.io/agent-deck](https://sverdejot.github.io/agent-deck/)**, picking the
-CH340 serial port. Or build it yourself: `mise run fw:flash`.
+deck's serial port. Or build it yourself: `mise run fw:flash`.
 
 **Start screen** (optional) — the same page turns a GIF, animated WebP/PNG, PNG or JPEG into the
 screen the deck shows while the Mac isn't connected, and writes it. It survives firmware updates.
@@ -48,14 +55,14 @@ agent-deck install-statusline   # record plan limits and context from the status
 agent on the new version. Installed by hand from the [latest release](https://github.com/sverdejot/agent-deck/releases/latest)
 instead, run `agent-deck install` after each update.
 
-The first time, macOS asks to let `agent-deck` control Ghostty. Everything is read locally from
+The first time, macOS asks to let `agent-deck` control your terminal. Everything is read locally from
 `~/.claude`; nothing leaves your machine. `agent-deck uninstall-statusline` and
 `agent-deck uninstall` undo both steps.
 
 ## Development
 
 ```
-firmware/         ESP32-S3 firmware (Rust, esp-idf)
+firmware/         deck firmware (Rust, esp-idf)
 crates/deck-ui/   screens, layout and protocol (Rust, runs and tests on the host)
 host/             Mac agent (Go)
 docs/protocol.md  serial protocol
@@ -74,7 +81,7 @@ mise run fw:flash                # flash the deck (stop agent-deck first: it hol
 
 ## Limitations
 
-- macOS only; focusing a session needs tmux + Ghostty, answering its questions needs tmux.
+- macOS only; focusing a session needs tmux and a supported terminal, answering its questions needs tmux.
 - Only sessions started from a terminal are shown (not the Claude desktop app or claude.ai).
 
 ## License

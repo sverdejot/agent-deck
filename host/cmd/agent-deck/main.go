@@ -27,7 +27,7 @@ var version = "dev"
 const usage = "usage: agent-deck [-port /dev/cu.x] [-v] [-version] [list|install|uninstall|install-statusline|uninstall-statusline|version]"
 
 func main() {
-	port := flag.String("port", "", "serial port (default: auto-detect the Indicator's CH340)")
+	port := flag.String("port", "", "serial port (default: auto-detect the deck)")
 	verbose := flag.Bool("v", false, "more output")
 	showVersion := flag.Bool("version", false, "print the version")
 	flag.Parse()

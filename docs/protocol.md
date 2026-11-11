@@ -1,12 +1,12 @@
 # Deck ↔ Mac protocol
 
-USB serial (the Indicator's CH340, `1a86:7523`), **115200 8N1**. The Mac must not toggle DTR/RTS:
-on the Indicator they drive the ESP32-S3's EN/IO0 (auto-reset), so opening the port with them
-asserted reboots the deck.
+USB serial (the deck's USB-serial bridge), **115200 8N1**. The Mac must not toggle DTR/RTS:
+on the deck they drive the microcontroller's reset and boot pins (auto-reset), so opening the
+port with them asserted reboots the deck.
 
 One message per line (`\n`), fields separated by TAB. Values never contain TAB, CR or LF (the Mac
 replaces them with spaces) and are UTF-8, cut on a character boundary to the sizes below. Unknown
-lines are ignored on both sides (the ESP32 boot ROM prints to the same port).
+lines are ignored on both sides (the deck's boot ROM prints to the same port).
 
 Implementations: `host/internal/deck` (Mac, Go) and `crates/deck-ui/src/protocol.rs` (deck, Rust).
 

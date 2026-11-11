@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Agent Deck flasher</title>
-  <meta name="description" content="Flash the Agent Deck firmware onto a SenseCAP Indicator D1 from the browser.">
+  <meta name="description" content="Flash the Agent Deck firmware onto the deck from the browser.">
   <script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
   <script type="module" src="start-screen.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,19 +89,19 @@
 <body>
   <main>
     <h1>Agent Deck</h1>
-    <p class="version">Firmware v__VERSION__ · ESP32-S3</p>
+    <p class="version">Firmware v__VERSION__</p>
     <p>
-      Firmware for the <strong>SenseCAP Indicator D1</strong>: a 4" touch screen that shows the
-      Claude Code sessions running on your Mac and brings the one you tap to the front.
+      Firmware for the <strong>deck</strong>: a small touch screen on your desk that shows the
+      Claude Code sessions running in your terminal and brings the one you tap to the front.
       The Mac side is the <code>agent-deck</code> program from the same
       <a href="https://github.com/sverdejot/agent-deck">repository</a>.
     </p>
 
     <div class="card">
       <ol>
-        <li>Connect the Indicator to this computer with a USB-C data cable.</li>
+        <li>Connect the deck to this computer with a USB data cable.</li>
         <li>Quit <code>agent-deck</code> if it is running: it holds the serial port.</li>
-        <li>Press <strong>Install</strong> and pick the <strong>CH340</strong> port
+        <li>Press <strong>Install</strong> and pick the deck's serial port
           (<code>USB Serial</code> / <code>usbserial-…</code>).</li>
       </ol>
       <p style="margin: 18px 0 0;">
@@ -114,8 +114,8 @@
 
     <p class="note">
       Needs Chrome or Edge on desktop (Web Serial). The image is written at offset 0 and
-      replaces whatever the ESP32-S3 had. Prefer the command line?
-      <code>espflash write-bin 0x0 agent-deck-firmware_*_esp32s3.bin</code> with the file from the
+      replaces whatever the deck had. Prefer the command line?
+      <code>espflash write-bin 0x0 agent-deck-firmware_*.bin</code> with the file from the
       <a href="https://github.com/sverdejot/agent-deck/releases/latest">latest release</a>.
     </p>
 

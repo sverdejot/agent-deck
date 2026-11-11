@@ -67,7 +67,7 @@ frame at boot, and rejects the file if anything is off.
 
 ## Size and write time
 
-The deck's CH340 serial chip only takes 115200 baud, about 11 KB/s after the flasher's
+The deck's USB-serial chip only takes 115200 baud, about 11 KB/s after the flasher's
 compression. A mostly still animation is small; one where the whole picture moves every frame
 (say, a wobbly hand-drawn line) costs about one byte per changed pixel per frame. Fewer colours,
 fewer frames or a smaller moving area make it quicker.
