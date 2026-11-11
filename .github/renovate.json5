@@ -1,0 +1,120 @@
+{
+  // Renovate (GitHub App) keeps every pinned version in the repo up to date: Go and the ESP tools in
+  // mise.toml, the Rust toolchains, ESP-IDF, the Go/Cargo dependencies, semantic-release and the
+  // SHA-pinned actions.
+  //
+  // Commit types matter: semantic-release (.github/release/package.json) only cuts a release for
+  // feat/fix/perf. Whatever ends up in a shipped artifact (the Mac binary or the firmware image) is
+  // committed as fix(deps) so the update reaches users; dev tooling and CI as chore(deps) / ci.
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'helpers:pinGitHubActionDigests',
+    ':semanticCommits',
+    'schedule:weekly',
+  ],
+  timezone: 'Europe/Madrid',
+  labels: ['dependencies'],
+  dependencyDashboard: true,
+
+  customManagers: [
+    {
+      // Xtensa Rust toolchain installed by espup (mise.toml [vars], read by CI and release)
+      customType: 'regex',
+      managerFilePatterns: ['/^mise\\.toml$/'],
+      matchStrings: ['esp_toolchain = "(?<currentValue>[^"]+)"'],
+      depNameTemplate: 'esp-rs/rust-build',
+      datasourceTemplate: 'github-releases',
+      extractVersionTemplate: '^v(?<version>.+)$',
+      versioningTemplate: 'loose',
+    },
+    {
+      // host Rust toolchain of the UI crate
+      customType: 'regex',
+      managerFilePatterns: ['/^crates/deck-ui/rust-toolchain\\.toml$/'],
+      matchStrings: ['channel = "(?<currentValue>\\d+\\.\\d+\\.\\d+)"'],
+      depNameTemplate: 'rust',
+      packageNameTemplate: 'rust-lang/rust',
+      datasourceTemplate: 'github-releases',
+    },
+    {
+      // ESP-IDF built by esp-idf-sys
+      customType: 'regex',
+      managerFilePatterns: ['/^firmware/\\.cargo/config\\.toml$/'],
+      matchStrings: ['ESP_IDF_VERSION = "(?<currentValue>v[^"]+)"'],
+      depNameTemplate: 'espressif/esp-idf',
+      datasourceTemplate: 'github-releases',
+    },
+  ],
+
+  packageRules: [
+    // ---- commit types --------------------------------------------------------------------------
+    {
+      // dev tooling: no release
+      matchManagers: ['mise', 'npm', 'custom.regex'],
+      semanticCommitType: 'chore',
+    },
+    {
+      matchManagers: ['github-actions'],
+      semanticCommitType: 'ci',
+    },
+    {
+      // shipped in the Mac binary or the firmware image: release it
+      matchManagers: ['gomod', 'cargo'],
+      semanticCommitType: 'fix',
+    },
+    {
+      // the compilers of the shipped artifacts (go.mod's go directive and mise's go move together)
+      matchDepNames: ['go', 'esp-rs/rust-build', 'espressif/esp-idf'],
+      semanticCommitType: 'fix',
+    },
+
+    // ---- grouping ------------------------------------------------------------------------------
+    {
+      // bump the go directive too, not only the dependencies
+      matchDatasources: ['golang-version'],
+      rangeStrategy: 'bump',
+    },
+    {
+      groupName: 'go',
+      matchDepNames: ['go'],
+    },
+    {
+      // esp-idf-svc / -hal / -sys and embuild must move together
+      groupName: 'esp-idf crates',
+      matchManagers: ['cargo'],
+      matchPackageNames: ['esp-idf-*', 'embuild'],
+    },
+    {
+      groupName: 'firmware crates',
+      matchManagers: ['cargo'],
+      matchFileNames: ['firmware/**'],
+      matchPackageNames: ['!esp-idf-*', '!embuild'],
+    },
+    {
+      groupName: 'deck-ui crates',
+      matchManagers: ['cargo'],
+      matchFileNames: ['crates/deck-ui/**'],
+    },
+    {
+      groupName: 'host go modules',
+      matchManagers: ['gomod'],
+      matchDepTypes: ['require', 'indirect'],
+    },
+    {
+      groupName: 'semantic-release',
+      matchManagers: ['npm'],
+    },
+    {
+      groupName: 'github actions',
+      matchManagers: ['github-actions'],
+    },
+    {
+      // 10.x needs conventional-changelog-writer 9; @semantic-release/release-notes-generator
+      // (14.x) still ships writer 8, and the release fails generating notes. Lift once it moves.
+      matchPackageNames: ['conventional-changelog-conventionalcommits'],
+      matchUpdateTypes: ['major'],
+      enabled: false,
+    },
+  ],
+}

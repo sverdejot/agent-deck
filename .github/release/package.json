@@ -1,7 +1,7 @@
 {
   "name": "agent-deck-release",
   "private": true,
-  "description": "semantic-release for agent-deck, pinned here so dependabot keeps it up to date. Run by .github/workflows/release.yml.",
+  "description": "semantic-release for agent-deck. Run by .github/workflows/release.yml.",
   "engines": { "node": "24.22.2" },
   "devDependencies": {
     "semantic-release": "25.0.9",

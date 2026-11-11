@@ -15,7 +15,7 @@ concurrency:
 # publishes the GitHub Release with the changelog as its notes. The jobs below attach the Mac
 # binaries, the merged firmware image and checksums.txt, and publish the web flasher (docs/flasher)
 # to GitHub Pages. Actions are pinned to commit SHAs (tag in the comment); semantic-release and its
-# preset are pinned in .github/release/package-lock.json, both kept up to date by dependabot.
+# preset are pinned in .github/release/package-lock.json.
 
 jobs:
   release:
