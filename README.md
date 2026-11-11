@@ -47,13 +47,12 @@ Format: [docs/splash.md](docs/splash.md).
 **Mac agent**:
 
 ```sh
-mise use -g 'github:sverdejot/agent-deck[postinstall=agent-deck install]'   # install, run at login (LaunchAgent)
-agent-deck install-statusline   # record plan limits and context from the statusline
+mise use -g github:sverdejot/agent-deck   # or download it from the latest release
+agent-deck install-statusline             # record plan limits and context from the statusline
+agent-deck install                        # run at login (LaunchAgent)
 ```
 
-`mise up` upgrades it; the `postinstall` hook re-runs `agent-deck install`, which restarts the
-agent on the new version. Installed by hand from the [latest release](https://github.com/sverdejot/agent-deck/releases/latest)
-instead, run `agent-deck install` after each update.
+To upgrade: `mise up agent-deck && agent-deck install` (restarts the agent on the new version).
 
 The first time, macOS asks to let `agent-deck` control your terminal. Everything is read locally from
 `~/.claude`; nothing leaves your machine. `agent-deck uninstall-statusline` and
